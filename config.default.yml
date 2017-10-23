@@ -1,0 +1,7 @@
+token:      your_token_here
+prefix:     '!'
+maxlength:  600
+dommy:      99612832353505280
+
+roles:
+  - name: GalaxyBot
