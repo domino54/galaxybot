@@ -3,5 +3,8 @@ prefix:     '!'
 maxlength:  600
 dommy:      99612832353505280
 
+youtube:
+  token:  your_token_here
+
 roles:
   - name: GalaxyBot

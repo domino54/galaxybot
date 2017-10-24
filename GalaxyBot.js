@@ -2,7 +2,9 @@ const Discord = require('discord.js');
 const https = require('https');
 const querystring = require('querystring');
 const yaml = require('js-yaml');
+const URL = require('url');
 const fs = require('fs');
+const yt_search = require('youtube-search');
 
 const Track = require('./Track');
 const Guild = require('./Guild');
@@ -45,6 +47,7 @@ class GalaxyBot {
 		this.client = new Discord.Client();
 		this.client.on('ready', () => { this.onLaunch(); });
 		this.client.on('message', message => { this.onMessage(message); });
+		this.client.on('channelDelete', channel => { this.onChannelDeleted(channel); });
 		this.activeGuilds = [];
 	}
 
@@ -185,6 +188,12 @@ class GalaxyBot {
 	playNextTrack(botGuild) {
 		this.log(botGuild, 'Next track playback requested.');
 
+		// Leave voice channel if queue is empty.
+		if (botGuild.tracksQueue.length <= 0) {
+			if (botGuild.voiceConnection) botGuild.voiceConnection.channel.leave();
+			return;
+		}
+		
 		// This can happen. Often.
 		if (!botGuild.voiceConnection) {
 			botGuild.lastTextChannel.send("I'm not in a voice channel. Something must've gone wrong...");
@@ -192,12 +201,6 @@ class GalaxyBot {
 			return;
 		}
 
-		// Leave voice channel if queue is empty.
-		if (botGuild.tracksQueue.length <= 0) {
-			if (botGuild.voiceConnection) botGuild.voiceConnection.channel.leave();
-			return;
-		}
-		
 		// Pick first track from the queue.
 		botGuild.currentTrack = botGuild.tracksQueue[0];
 		botGuild.tracksQueue.shift();
@@ -215,30 +218,21 @@ class GalaxyBot {
 		}
 
 		if (botGuild.voiceDispatcher) {
-			botGuild.voiceDispatcher.on('end', () => {
+			botGuild.voiceDispatcher.on('end', reason => {
 				botGuild.currentTrack = false;
-				//botGuild.resetGame();
+				botGuild.voiceDispatcher = false;
 				this.log(botGuild, 'Voice dispatcher end.');
-				this.playNextTrack(botGuild);
+
+				// Delay is necessary for slower connections to don't skip next track immediately.
+				setTimeout(() => { this.playNextTrack(botGuild); }, 250);
+			});
+			botGuild.voiceDispatcher.on('error', error => {
+				console.log(error);
 			});
 		}
 
-		//botGuild.setGame(botGuild.currentTrack.title);
 		this.nowPlaying(botGuild, true);
-	}
-
-	/**
-	 * Fired when a new track is added to the queue.
-	 *
-	 * @param {Guild} botGuild - The guild in which track was added to the queue.
-	 * @param {Track} track - Newly added track.
-	 */
-	onTrackAdded(botGuild, track) {
-		// Very first track queued.
-		if (!botGuild.currentTrack) this.playNextTrack(botGuild);
-		
-		// Show queue message.
-		else botGuild.lastTextChannel.send(compose('<@%1>, your track is **#%2** in the queue:', track.sender.id, botGuild.tracksQueue.length), track.embed);
+		this.log(botGuild, 'Now playing: ' + botGuild.currentTrack.title);
 	}
 
 	/**
@@ -260,6 +254,64 @@ class GalaxyBot {
 			if (withMention) header = "I'm playing your track now, <@" + botGuild.currentTrack.sender.id + ">! :metal:";
 			botGuild.lastTextChannel.send(header, botGuild.currentTrack.embed);
 		}
+	}
+
+	/**
+	 * Fired when a new track has been created.
+	 *
+	 * @param {Guild} botGuild - Guild in which track has been crated.
+	 * @param {Track} track - Newly created track.
+	 * @param {GuildMember} member - User, which created the track.
+	 * @param {String} url - The URL of the track source.
+	 */
+	onTrackCreated(botGuild, track, member, url) {
+		if (!botGuild || !member || !member.voiceChannel) return;
+
+		// (Let's just ignore the fact we're in 'onTrackCreated' method) Track not created.
+		if (!track) {
+			botGuild.lastTextChannel.send(compose("Sorry <@%1>, but I can't play anything from that link. :shrug:", member.id));
+			this.log(botGuild, compose('Track %1 not added: no information.', url));
+			return;
+		}
+
+		// Track is too long and user has no permission to surpass the limit.
+		if (!this.hasControlOverBot(member) && track.duration > this.config.maxlength) {
+			botGuild.lastTextChannel.send(compose(
+				'Sorry <@%1>, **%2** is too long! (%3/%4) :rolling_eyes:',
+				member.id, track.title, track.timeToText(track.duration), track.timeToText(this.config.maxlength)
+			));
+			this.log(botGuild, compose('Track %1 not added: too long (%2/%3).', url, track.duration, this.config.maxlength));
+			return;
+		}
+
+		// DES-PA-CITO.
+		if (track.title.toLowerCase().indexOf('despacito') >= 0) {
+			botGuild.lastTextChannel.send('Anything related to "Despacito" is FUCKING BLACKLISTED. :middle_finger:');
+			this.log(botGuild, compose('Track %1 not added: blacklisted.', url));
+			return;
+		}
+
+		// Queue new track.
+		botGuild.tracksQueue.push(track);
+
+		// Create voice connection for current guild, if doesn't exist.
+		if (!botGuild.voiceConnection) {
+			member.voiceChannel.join().then(connection => {
+				botGuild.voiceConnection = connection;
+				botGuild.voiceConnection.on('disconnect', () => {
+					botGuild.voiceConnection = false;
+					this.log(botGuild, 'Disconnected from voice.');
+				});
+				this.playNextTrack(botGuild);
+				this.log(botGuild, 'Created new voice connection.');
+			});
+		}
+
+		// Somehow we are in voice channel, but nothing is being played.
+		else if (!botGuild.currentTrack) this.playNextTrack(botGuild);
+		
+		// Show queue message.
+		else botGuild.lastTextChannel.send(compose('<@%1>, your track is **#%2** in the queue:', member.id, botGuild.tracksQueue.length), track.embed);
 	}
 
 	/**
@@ -400,10 +452,11 @@ class GalaxyBot {
 				}
 
 				if (!botGuild.currentTrack) return;
-				if (botGuild.voiceDispatcher) botGuild.voiceDispatcher.end();
 
-				message.channel.send('All right, skipping current track! :thumbsup:');
+				message.channel.send('Allright, skipping current track! :thumbsup:');
 				this.log(botGuild, 'Current track skipped through command.');
+
+				if (botGuild.voiceDispatcher) botGuild.voiceDispatcher.end();
 				break;
 			}
 
@@ -417,12 +470,14 @@ class GalaxyBot {
 				}
 
 				if (!botGuild.currentTrack) return;
-				if (botGuild.voiceDispatcher) botGuild.voiceDispatcher.end();
-				if (botGuild.voiceConnection) botGuild.voiceConnection.channel.leave();
-				botGuild.tracksQueue = [];
 
-				message.channel.send('Abort! Playback has been stopped. :no_good:');
+				message.channel.send('Abort! Playback has been stopped and queue emptied. :no_good:');
 				this.log(botGuild, 'Stopped playback on admin command.');
+
+				botGuild.tracksQueue = [];
+				if (botGuild.voiceConnection) botGuild.voiceConnection.channel.leave();
+				if (botGuild.voiceDispatcher) botGuild.voiceDispatcher.end();
+
 				break;
 			}
 
@@ -438,59 +493,43 @@ class GalaxyBot {
 
 				// Music player not running and user is not in a voice channel.
 				if (!botGuild.voiceConnection && !message.member.voiceChannel) {
-					message.channel.send('You need to be in a voice channel.');
+					message.channel.send('You need to be in a voice channel. :loud_sound:');
 					this.log(botGuild, 'User not in a voice channel.');
 					break;
 				}
 
-				var targetVoiceChannel = message.member.voiceChannel;
+				// Create a new track object for the speicifed URL.
+				var url = args[0];
+				var query = args.join(' ');
+				this.log(botGuild, compose('Track requested by %1: %2', message.member.displayName, query));
 
-				// Create a new track object for each URL speicifed.
-				for (var i = 0; i < args.length; i++) {
-					var url = args[i];
-					this.log(botGuild, compose('Track requested by %1: %2', message.member.displayName, url));
-
+				// Try to load track from given URL.
+				if (URL.parse(url).hostname) {
 					var track = new Track(url, message.member, (track) => {
-						if (!track) {
-							this.log(botGuild, compose('Track %1 not added: no information.', url));
-							return;
-						}
+						this.onTrackCreated(botGuild, track, message.member, url);
+					});
+				}
 
-						// Track is too long and user has no permission to surpass the limit.
-						if (!this.hasControlOverBot(message.member) && track.duration > this.config.maxlength) {
-							botGuild.lastTextChannel.send(compose(
-								'Sorry <@%1>, **%2** is too long! (%3/%4) :rolling_eyes:',
-								message.member.id, track.title, track.timeToText(track.duration), track.timeToText(this.config.maxlength)
-							));
-							this.log(botGuild, compose('Track %1 not added: too long (%2/%3).', url, track.duration, this.config.maxlength));
-							return;
-						}
+				// Can't search in YouTube: API token not provided.
+				else if (!this.config.youtube.token) {
+					message.channel.send('You need to be in a voice channel. :loud_sound:');
+					this.log(botGuild, 'User not in a voice channel.');
+					break;
+				}
 
-						// DES-PA-CITO.
-						if (track.title.toLowerCase().indexOf('despacito') >= 0) {
-							botGuild.lastTextChannel.send('Anything related to "Despacito" is FUCKING BLACKLISTED. :middle_finger:');
-							this.log(botGuild, compose('Track %1 not added: blacklisted.', url));
-							return;
-						}
-
-						// Queue new track.
-						botGuild.tracksQueue.push(track);
-
-						// Create voice connection for current guild, if doesn't exist.
-						if (!botGuild.voiceConnection) {
-							targetVoiceChannel.join().then(connection => {
-								botGuild.voiceConnection = connection;
-								botGuild.voiceConnection.on('disconnect', () => {
-									botGuild.voiceConnection = false;
-									this.log(botGuild, 'Disconnected from voice.');
-								});
-								this.onTrackAdded(botGuild, track);
-								this.log(botGuild, 'Created new voice connection.');
+				// Search for the song in YouTube.
+				else {
+					var options = {
+						maxResults: 1,
+						key: this.config.youtube.token
+					};
+					yt_search(query, options, (error, results) => {
+						if (error) return console.log(error);
+						if (results.length > 0) {
+						 	var track = new Track(results[0].link, message.member, (track) => {
+								this.onTrackCreated(botGuild, track, message.member, url);
 							});
 						}
-
-						else this.onTrackAdded(botGuild, track);
-						this.log(botGuild, 'Track successfully added: ' + track.title);
 					});
 				}
 
@@ -546,6 +585,28 @@ class GalaxyBot {
 		if (message.content.toLowerCase().indexOf('markiel') >= 0) {
 			message.react('markiel:258199535673671680');
 			message.channel.send({files: ['./markiel.png']});
+		}
+	}
+
+	/**
+	 * When a channel is destroyed.
+	 *
+	 * @param {Channel} channel - The channel that was just destroyed.
+	 */
+	onChannelDeleted(channel) {
+		if (!channel) return;
+
+		for (var i = 0; i < this.activeGuilds.length; i++) {
+			var guild = this.activeGuilds[i];
+			if (!guild.voiceConnection || guild.voiceConnection.channel != channel) continue;
+
+			// React like if we used 'stop'. Okay, a little bit more upset.
+			guild.lastTextChannel.send('HELLO? I WAS PLAYING MUSIC HERE! Thank you for destroying the party... :angry:');
+			this.log(guild, 'Someone deleted channel where bot was playing music.');
+
+			guild.tracksQueue = [];
+			if (guild.voiceConnection) guild.voiceConnection.channel.leave();
+			if (guild.voiceDispatcher) guild.voiceDispatcher.end();
 		}
 	}
 }

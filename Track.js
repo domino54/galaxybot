@@ -38,8 +38,13 @@ class Track {
 	 */
 	loadYouTube(callback) {
 		try {
-			this.stream = ytdl(this.url, {filter: "audioonly"}); ///< TODO: Fix livestreams crashing the whole bot.
+			this.stream = ytdl(this.url, {filter: 'audioonly'}); ///< TODO: Fix livestreams crashing the whole bot.
 			this.stream.on("info", (info, format) => {
+				if (!format) {
+					callback(false);
+					return;
+				}
+
 				this.author = info.author;
 				this.title = info.title;
 				this.thumbnail = info.thumbnail_url;
