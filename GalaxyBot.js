@@ -49,7 +49,7 @@ class GalaxyBot {
 	}
 
 	init() {
-		console.log('Initializing GalaxyBot...');
+		this.log(false, 'Initializing GalaxyBot...');
 
 		// Load YAML config.
 		try {
@@ -66,7 +66,7 @@ class GalaxyBot {
 	}
 
 	onLaunch() {
-		console.log('GalaxyBot is ready!');
+		this.log(false, 'GalaxyBot is ready!');
 		this.setGame('with Dommy');
 	}
 
@@ -121,6 +121,7 @@ class GalaxyBot {
 
 	// TODO: Remove these.
 	setGame(name) {
+
 		this.client.user.setPresence({game: {name: name}});
 	}
 
@@ -129,6 +130,19 @@ class GalaxyBot {
 	}
 
 	// ------------------- ^^^ CLEAN THIS UP FFS ^^^ ------------------- //
+
+	/**
+	 * Prints a log in the console.
+	 *
+	 * @param {Guild} botGuild - The quild log is refering to.
+	 * @param {String} text - The log content.
+	 */
+	log(botGuild, text) {
+		var time = new Date().getTime();
+		var guildName = 'GLOBAL';
+		if (botGuild) guildName = botGuild.name;
+		console.log('['+time+'] ['+guildName+'] ' + text);
+	}
 
 	/**
 	 * Get the bot guild object of given guild.
@@ -143,8 +157,9 @@ class GalaxyBot {
 		}
 
 		// Create new bot guild if doesn't exist yet.
-		var botGuild = new Guild(message.guild.id);
+		var botGuild = new Guild(guild.id);
 		this.activeGuilds.push(botGuild);
+		this.log(false, 'New guild registered: ' + guild.name);
 		return botGuild;
 	}
 
@@ -168,9 +183,12 @@ class GalaxyBot {
 	 * @param {Guild} botGuild - The bot quild we decide to play next track in.
 	 */
 	playNextTrack(botGuild) {
+		this.log(botGuild, 'Next track playback requested.');
+
 		// This can happen. Often.
 		if (!botGuild.voiceConnection) {
 			botGuild.lastTextChannel.send("I'm not in a voice channel. Something must've gone wrong...");
+			this.log(botGuild, 'Not in a voice channel.');
 			return;
 		}
 
@@ -186,16 +204,21 @@ class GalaxyBot {
 
 		// Play stream.
 		try {
-			botGuild.voiceDispatcher = botGuild.voiceConnection.playStram(botGuild.currentTrack.stream); ///< This will crash if we specify livestream.
+			botGuild.voiceDispatcher = botGuild.voiceConnection.playStream(botGuild.currentTrack.stream); ///< This will crash if we specify livestream.
+			this.log(botGuild, 'Creating new voice dispatcher.');
 		}
 		catch (error) {
-			botGuild.lastTextChannel.send("Something must've gone wrong with last track, I couldn't play it..."); ///< THIS IS NEVER PRINTED FFS.
+			botGuild.lastTextChannel.send("Something must've gone wrong with last track, I couldn't play it...");
+			console.log(error);
+			this.playNextTrack(botGuild);
+			return;
 		}
 
 		if (botGuild.voiceDispatcher) {
 			botGuild.voiceDispatcher.on('end', () => {
 				botGuild.currentTrack = false;
 				//botGuild.resetGame();
+				this.log(botGuild, 'Voice dispatcher end.');
 				this.playNextTrack(botGuild);
 			});
 		}
@@ -257,6 +280,10 @@ class GalaxyBot {
 
 		// Register new server if not registered yet.
 		var botGuild = this.getBotGuild(message.guild);
+		botGuild.name = message.guild.name;
+
+		// Log command.
+		this.log(botGuild, compose('Command sent by %1: %2', message.member.displayName, name));
 		
 		switch (name) {
 			// Show available commands list.
@@ -284,6 +311,7 @@ class GalaxyBot {
 			// Mention Dommy.
 			case 'dommy' : {
 				message.channel.send(compose('<@%1> https://giphy.com/gifs/movie-mrw-see-2H67VmB5UEBmU', this.config.dommy));
+				this.log(botGuild, 'Dommy mentioned.');
 				break;
 			}
 
@@ -293,6 +321,7 @@ class GalaxyBot {
 					"Maybe I can't explain you how to understand women, but you can look at my source code instead! :hugging:\n" +
 					'https://github.com/domino54/galaxybot'
 				);
+				this.log(botGuild, 'Pasted GitHub repo link.');
 				break;
 			}
 
@@ -302,6 +331,7 @@ class GalaxyBot {
 					'Want me to party hard with you on your server? Use the link below! :sunglasses:\n' +
 					'https://discordapp.com/oauth2/authorize?client_id=%1&scope=bot', this.client.user.id
 				));
+				this.log(botGuild, 'Pasted bot invitation link.');
 				break;
 			}
 
@@ -340,7 +370,7 @@ class GalaxyBot {
 				break;
 			}
 
-			// List max. 5 upcoming tracks.
+			// List max. 10 upcoming tracks.
 			case 'queue' : {
 				botGuild.lastTextChannel = message.channel;
 
@@ -369,8 +399,11 @@ class GalaxyBot {
 					return;
 				}
 
+				if (!botGuild.currentTrack) return;
 				if (botGuild.voiceDispatcher) botGuild.voiceDispatcher.end();
-				console.log('Current track skipped through command. Guild: ' + botGuild.id);
+
+				message.channel.send('All right, skipping current track! :thumbsup:');
+				this.log(botGuild, 'Current track skipped through command.');
 				break;
 			}
 
@@ -383,10 +416,13 @@ class GalaxyBot {
 					return;
 				}
 
-				botGuild.tracksQueue = [];
+				if (!botGuild.currentTrack) return;
 				if (botGuild.voiceDispatcher) botGuild.voiceDispatcher.end();
-				if (botGuild.voiceConnection) botGuild.voiceConnection.message.channel.leave();
-				console.log('Stopped playback on admin command. Guild: ' + botGuild.id);
+				if (botGuild.voiceConnection) botGuild.voiceConnection.channel.leave();
+				botGuild.tracksQueue = [];
+
+				message.channel.send('Abort! Playback has been stopped. :no_good:');
+				this.log(botGuild, 'Stopped playback on admin command.');
 				break;
 			}
 
@@ -403,7 +439,7 @@ class GalaxyBot {
 				// Music player not running and user is not in a voice channel.
 				if (!botGuild.voiceConnection && !message.member.voiceChannel) {
 					message.channel.send('You need to be in a voice channel.');
-					console.log('User not in a voice channel.');
+					this.log(botGuild, 'User not in a voice channel.');
 					break;
 				}
 
@@ -412,8 +448,13 @@ class GalaxyBot {
 				// Create a new track object for each URL speicifed.
 				for (var i = 0; i < args.length; i++) {
 					var url = args[i];
+					this.log(botGuild, compose('Track requested by %1: %2', message.member.displayName, url));
+
 					var track = new Track(url, message.member, (track) => {
-						if (!track) return;
+						if (!track) {
+							this.log(botGuild, compose('Track %1 not added: no information.', url));
+							return;
+						}
 
 						// Track is too long and user has no permission to surpass the limit.
 						if (!this.hasControlOverBot(message.member) && track.duration > this.config.maxlength) {
@@ -421,12 +462,14 @@ class GalaxyBot {
 								'Sorry <@%1>, **%2** is too long! (%3/%4) :rolling_eyes:',
 								message.member.id, track.title, track.timeToText(track.duration), track.timeToText(this.config.maxlength)
 							));
+							this.log(botGuild, compose('Track %1 not added: too long (%2/%3).', url, track.duration, this.config.maxlength));
 							return;
 						}
 
 						// DES-PA-CITO.
 						if (track.title.toLowerCase().indexOf('despacito') >= 0) {
 							botGuild.lastTextChannel.send('Anything related to "Despacito" is FUCKING BLACKLISTED. :middle_finger:');
+							this.log(botGuild, compose('Track %1 not added: blacklisted.', url));
 							return;
 						}
 
@@ -439,15 +482,27 @@ class GalaxyBot {
 								botGuild.voiceConnection = connection;
 								botGuild.voiceConnection.on('disconnect', () => {
 									botGuild.voiceConnection = false;
+									this.log(botGuild, 'Disconnected from voice.');
 								});
 								this.onTrackAdded(botGuild, track);
+								this.log(botGuild, 'Created new voice connection.');
 							});
 						}
 
 						else this.onTrackAdded(botGuild, track);
-						console.log('Track successfully added: ' + url);
+						this.log(botGuild, 'Track successfully added: ' + track.title);
 					});
 				}
+
+				break;
+			}
+
+			// List all guilds the bot is active in.
+			case 'guilds' : {
+				var serversNames = [];
+				for (var i = 0; i < this.activeGuilds.length; i++) serversNames.push(this.activeGuilds[i].name);
+				message.channel.send(compose("I'm active in %1 server(s): %2.", serversNames.length, serversNames.join(', ')));
+				break;
 			}
 		}
 	}
