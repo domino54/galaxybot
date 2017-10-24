@@ -1,5 +1,5 @@
 /**
- * The Guild object.
+ * The Guild class.
  * Stores information about current music player status in given guild.
  */
 class Guild {
@@ -10,6 +10,7 @@ class Guild {
 	 */
 	constructor(guildId) {
 		this.id = guildId;
+		this.name = '';
 		this.lastTextChannel = false;
 		this.voiceConnection = false;
 		this.voiceDispatcher = false;
