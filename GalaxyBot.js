@@ -1,10 +1,11 @@
 const Discord = require('discord.js');
-const https = require('https');
+const yt_search = require('youtube-search');
 const querystring = require('querystring');
 const yaml = require('js-yaml');
+
+const https = require('https');
 const URL = require('url');
 const fs = require('fs');
-const yt_search = require('youtube-search');
 
 const Track = require('./Track');
 const Guild = require('./Guild');
@@ -28,32 +29,7 @@ const titleNames = {
 const formatSkip1 = ['g', 'h', 'i', 'l', 'm', 'n', 'o', 'p', 's', 't', 'w', 'z'];
 const formatSkip3 = ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'a', 'b', 'c', 'd', 'e', 'f'];
 
-function replaceAll(string, toReplace, replacement) {
-	var output = string;
-	while (output.indexOf(toReplace) >= 0) output = output.replace(toReplace, replacement);
-	return output;
-}
-
-function compose() {
-	if (arguments.length == 0) return '';
-	if (arguments.length == 1) return arguments[0];
-	var output = arguments[0];
-	for (var i = 1; i < arguments.length; i++) output = replaceAll(output, '%'+i, arguments[i]);
-	return output;
-}
-
 class GalaxyBot {
-	constructor() {
-		this.client = new Discord.Client();
-		this.client.on('ready', () => { this.onReady(); });
-		this.client.on('message', message => { this.onMessage(message); });
-		this.client.on('channelDelete', channel => { this.onChannelDeleted(channel); });
-		this.client.on('guildMemberRemove', member => { this.onMemberRemoved(member); })
-		this.activeGuilds = [];
-	}
-
-	
-
 	removeMPformat(string) {
 		var output = '';
 		for (var i = 0; i < string.length; i++) {
@@ -78,7 +54,7 @@ class GalaxyBot {
 
 				// No servers were found.
 				if (result.length <= 0) {
-					channel.send(compose('Looks like there are no online servers in **%1** right now. :rolling_eyes:', titleName));
+					channel.send(this.compose('Looks like there are no online servers in **%1** right now. :rolling_eyes:', titleName));
 					return;
 				}
 
@@ -86,15 +62,15 @@ class GalaxyBot {
 				var serversInfo = [];
 				for (var i = 0; i < result.length && i < 10; i++) {
 					var server = result[i];
-					serversInfo.push(compose('%1. %2/%3 %4', i+1, server['player_count'], server['player_max'], this.removeMPformat(server['name'])));
+					serversInfo.push(this.compose('%1. %2/%3 %4', i+1, server['player_count'], server['player_max'], this.removeMPformat(server['name'])));
 				}
 
 				// Servers list header.
 				var messageHeader;
 				switch (result.length) {
-					case 1 : { messageHeader = compose('There is **one %1** server online:', titleName); break; }
-					case 11 : { messageHeader = compose('There are over **10 %1** servers online:', titleName); break; }
-					default : { messageHeader = compose('There are **%1 %2** servers online:', result.length, titleName); break; }
+					case 1 : { messageHeader = this.compose('There is **one %1** server online:', titleName); break; }
+					case 11 : { messageHeader = this.compose('There are over **10 %1** servers online:', titleName); break; }
+					default : { messageHeader = this.compose('There are **%1 %2** servers online:', result.length, titleName); break; }
 				}
 
 				var embed = '```'+serversInfo.join('\n')+'```';
@@ -103,13 +79,19 @@ class GalaxyBot {
 		});
 	}
 
-	// TODO: Remove these.
-	setGame(name) {
-
-		this.client.user.setPresence({game: {name: name}});
-	}
-
 	// ------------------- ^^^ CLEAN THIS UP FFS ^^^ ------------------- //
+
+	/**
+	 * Creates a new GalaxyBot.
+	 */
+	constructor() {
+		this.client = new Discord.Client();
+		this.client.on('ready', () => { this.onReady(); });
+		this.client.on('message', message => { this.onMessage(message); });
+		this.client.on('channelDelete', channel => { this.onChannelDeleted(channel); });
+		this.client.on('guildMemberRemove', member => { this.onMemberRemoved(member); })
+		this.activeGuilds = [];
+	}
 
 	/**
 	 * Prints a log in the console.
@@ -130,6 +112,12 @@ class GalaxyBot {
 	start() {
 		this.log(false, 'Initializing GalaxyBot...');
 
+		// Load help page.
+		fs.readFile('./helppage.md', 'utf8', (error, data) => {
+			if (error) return console.log(error);
+			this.helpPage = data;
+		});
+		
 		// Load YAML config.
 		try {
 			this.config = yaml.safeLoad(fs.readFileSync('./config.yml', 'utf8'));
@@ -154,6 +142,34 @@ class GalaxyBot {
 	 */
 	onReady() {
 		this.log(false, 'GalaxyBot is ready!');
+	}
+
+	/**
+	 * Replace all accurences of a phrase in string.
+	 *
+	 * @param {String} string - The string to replace stuff in.
+	 * @param {String} toReplace - Phrase to be replaced.
+	 * @param {String} replacement - Replacement phrase.
+	 * @returns {String} The output string.
+	 */
+	replaceAll(string, toReplace, replacement) {
+		var output = string;
+		while (output.indexOf(toReplace) >= 0) output = output.replace(toReplace, replacement);
+		return output;
+	}
+
+	/**
+	 * Compose a message.
+	 * Replaces nodes (%n) with arguments provided.
+	 *
+	 * @returns {String} The composed message.
+	 */
+	compose() {
+		if (arguments.length == 0) return '';
+		if (arguments.length == 1) return arguments[0];
+		var output = arguments[0];
+		for (var i = 1; i < arguments.length; i++) output = this.replaceAll(output, '%'+i, arguments[i]);
+		return output;
 	}
 
 	/**
@@ -214,9 +230,15 @@ class GalaxyBot {
 		botGuild.currentTrack = botGuild.tracksQueue[0];
 		botGuild.tracksQueue.shift();
 
-		// Play stream.
+		// Play stream or direct URL.
 		try {
-			botGuild.voiceDispatcher = botGuild.voiceConnection.playStream(botGuild.currentTrack.stream); ///< This will crash if we specify livestream.
+			if (botGuild.currentTrack.stream) {
+				botGuild.voiceDispatcher = botGuild.voiceConnection.playStream(botGuild.currentTrack.stream);
+			}
+			else if (botGuild.currentTrack.sourceURL) {
+				botGuild.voiceDispatcher = botGuild.voiceConnection.playArbitraryInput(botGuild.currentTrack.sourceURL);
+			}
+
 			this.log(botGuild, 'Creating new voice dispatcher.');
 		}
 		catch (error) {
@@ -279,25 +301,25 @@ class GalaxyBot {
 
 		// (Let's just ignore the fact we're in 'onTrackCreated' method) Track not created.
 		if (!track) {
-			botGuild.lastTextChannel.send(compose("Sorry <@%1>, but I can't play anything from that link. :shrug:", member.id));
-			this.log(botGuild, compose('Track %1 not added: no information.', url));
+			botGuild.lastTextChannel.send(this.compose("Sorry <@%1>, but I can't play anything from that link. :shrug:", member.id));
+			this.log(botGuild, this.compose('Track %1 not added: no information.', url));
 			return;
 		}
 
 		// Track is too long and user has no permission to surpass the limit.
 		if (!this.hasControlOverBot(member) && track.duration > this.config.maxlength) {
-			botGuild.lastTextChannel.send(compose(
+			botGuild.lastTextChannel.send(this.compose(
 				'Sorry <@%1>, **%2** is too long! (%3/%4) :rolling_eyes:',
 				member.id, track.title, track.timeToText(track.duration), track.timeToText(this.config.maxlength)
 			));
-			this.log(botGuild, compose('Track %1 not added: too long (%2/%3).', url, track.duration, this.config.maxlength));
+			this.log(botGuild, this.compose('Track %1 not added: too long (%2/%3).', url, track.duration, this.config.maxlength));
 			return;
 		}
 
 		// DES-PA-CITO.
 		if (track.title.toLowerCase().indexOf('despacito') >= 0) {
 			botGuild.lastTextChannel.send('Anything related to "Despacito" is FUCKING BLACKLISTED. :middle_finger:');
-			this.log(botGuild, compose('Track %1 not added: blacklisted.', url));
+			this.log(botGuild, this.compose('Track %1 not added: blacklisted.', url));
 			return;
 		}
 
@@ -322,7 +344,7 @@ class GalaxyBot {
 		else if (!botGuild.currentTrack) this.playNextTrack(botGuild);
 		
 		// Show queue message.
-		else botGuild.lastTextChannel.send(compose('<@%1>, your track is **#%2** in the queue:', member.id, botGuild.tracksQueue.length), track.embed);
+		else botGuild.lastTextChannel.send(this.compose('<@%1>, your track is **#%2** in the queue:', member.id, botGuild.tracksQueue.length), track.embed);
 	}
 
 	/**
@@ -346,35 +368,18 @@ class GalaxyBot {
 		botGuild.name = message.guild.name;
 
 		// Log command.
-		this.log(botGuild, compose('Command sent by %1: %2', message.member.displayName, name));
+		this.log(botGuild, this.compose('Command sent by %1: %2', message.member.displayName, name));
 		
 		switch (name) {
 			// Show available commands list.
 			case 'help' : {
-				message.channel.send(compose(
-					"Hello <@%1>! Here are my commands: :butterfly:\n" +
-					"\nGeneral\n" +
-					"**%2dommy** - summon Dommy out of nowhere!\n" +
-					"**%2git** - Wanna see how I was made? ( ͡° ͜ʖ ͡°) I'll link you my source code on GitHub!\n" +
-					"**%2invite** - If you want me to join your server, use this command!\n" +
-					"\nManiaPlanet\n" +
-					"**%2servers <galaxy|pursuit|stadium>** - Listing max. 10 servers of a specific title.\n" +
-					"\nMusic player\n" +
-					"**%2play <url>** - I'm gonna join your voice channel and play the song for you!\n" +
-					"**%2undo** - If you requested wrong song, remove it using this command.\n" +
-					"**%2now** - I will tell you what song (and if) I'm currently playing.\n" +
-					"**%2next** - If there's something next in the queue, I'll tell you what it is!\n" +
-					"**%2queue** - I will inform you what are the 10 upcoming songs!\n" +
-					"**%2skip** - Lets administrators skip that long shittyflute remix...\n" +
-					"**%2stop** - Abort the mission! This command completely stops music playback.",
-					message.member.id, this.config.prefix
-				));
+				message.channel.send(this.compose(this.helpPage, message.member.id, this.config.prefix));
 				break;
 			}
 
 			// Mention Dommy.
 			case 'dommy' : {
-				message.channel.send(compose('<@%1> https://giphy.com/gifs/movie-mrw-see-2H67VmB5UEBmU', this.config.dommy));
+				message.channel.send(this.compose('<@%1> https://giphy.com/gifs/movie-mrw-see-2H67VmB5UEBmU', this.config.dommy));
 				this.log(botGuild, 'Dommy mentioned.');
 				break;
 			}
@@ -391,7 +396,7 @@ class GalaxyBot {
 
 			// Redirects to page, where user can add this bot to their server.
 			case 'invite' : {
-				message.channel.send(compose(
+				message.channel.send(this.compose(
 					'Want me to party hard with you on your server? Use the link below! :sunglasses:\n' +
 					'https://discordapp.com/oauth2/authorize?client_id=%1&scope=bot', this.client.user.id
 				));
@@ -405,7 +410,7 @@ class GalaxyBot {
 				if (args.length > 0) title = args[0].toLowerCase();
 
 				if (!(title in titleIds)) {
-					message.channel.send(compose("Sorry <@%1>, I can't recognize the '%2' title... :shrug:", message.member.id, title));
+					message.channel.send(this.compose("Sorry <@%1>, I can't recognize the '%2' title... :shrug:", message.member.id, title));
 					break;
 				}
 
@@ -430,7 +435,38 @@ class GalaxyBot {
 					break;
 				}
 
-				message.channel.send('Up next:', botGuild.tracksQueue[0].createEmbed());
+				// Get the order of the track from queue to get.
+				var trackOrder = 0;
+				if (args[0]) {
+					// Get next track requested by the user.
+					if (args[0] == 'me') {
+						for (var i = 0; i < botGuild.tracksQueue.length; i++) {
+							var track = botGuild.tracksQueue[i];
+							if (track.sender != message.member) continue;
+							message.channel.send(this.compose('Your next track is **#%1** in the queue, <@%2>:', i+1, message.member.id), track.createEmbed());
+							return;
+						}
+						message.reply('looks like there are no upcoming tracks requested by you.');
+						break;
+					}
+					else trackOrder = parseInt(args[0]) - 1;
+				}
+
+				// Invalid order.
+				if (trackOrder < 0) {
+					message.channel.send("Aren't you supposed to enter number greater or equal to 1? :face_palm:");
+					break;
+				}
+
+				// Queue is not that long
+				if (!botGuild.tracksQueue[trackOrder]) {
+					message.channel.send(this.compose('Queue is only **%1** track%2 long. :shrug:', botGuild.tracksQueue.length, (botGuild.tracksQueue.length > 1 ? 's' : '')));
+					break;
+				}
+
+				var header = 'Up next:';
+				if (trackOrder > 0) header = this.compose('**#%1** in the queue:', trackOrder + 1);
+				message.channel.send(header, botGuild.tracksQueue[trackOrder].createEmbed());
 				break;
 			}
 
@@ -448,7 +484,7 @@ class GalaxyBot {
 				var tracksInfos = [];
 				for (var i = 0; i < botGuild.tracksQueue.length && i < 10; i++) {
 					var track = botGuild.tracksQueue[i];
-					tracksInfos.push(compose('`%1.` **%2** (requested by %3)', ((i<9) ? '0' : '') + (i+1), track.title, track.sender.displayName));
+					tracksInfos.push(this.compose('`%1.` **%2** (requested by %3)', ((i<9) ? '0' : '') + (i+1), track.title, track.sender.displayName));
 				}
 				message.channel.send('Up next:\n' + tracksInfos.join('\n'));
 				break;
@@ -525,7 +561,7 @@ class GalaxyBot {
 				}
 
 				// Remove latest track.
-				message.channel.send(compose('<@%1>, I removed your latest track, **%2**.', message.member.id, trackToRemove.title));
+				message.channel.send(this.compose('<@%1>, I removed your latest track, **%2**.', message.member.id, trackToRemove.title));
 				botGuild.tracksQueue.splice(botGuild.tracksQueue.indexOf(trackToRemove), 1);
 				break;
 			}
@@ -542,15 +578,22 @@ class GalaxyBot {
 
 				// Music player not running and user is not in a voice channel.
 				if (!botGuild.voiceConnection && !message.member.voiceChannel) {
-					message.channel.send('You need to be in a voice channel. :loud_sound:');
-					this.log(botGuild, 'User not in a voice channel.');
+					message.channel.send('You need join a voice channel before I can start playing anything. :loud_sound:');
+					this.log(botGuild, 'User not in any voice channel.');
+					break;
+				}
+
+				// User not in our voice channel.
+				if (message.member.voiceChannel != botGuild.voiceConnection.channel && !this.hasControlOverBot(message.member)) {
+					message.channel.send('You need to join my voice channel if you want to request something. :point_up:');
+					this.log(botGuild, 'User not in voice channel with bot.');
 					break;
 				}
 
 				// Create a new track object for the speicifed URL.
 				var url = args[0];
 				var query = args.join(' ');
-				this.log(botGuild, compose('Track requested by %1: %2', message.member.displayName, query));
+				this.log(botGuild, this.compose('Track requested by %1: %2', message.member.displayName, query));
 
 				// Try to load track from given URL.
 				if (URL.parse(url).hostname) {
@@ -589,7 +632,7 @@ class GalaxyBot {
 			case 'guilds' : {
 				var serversNames = [];
 				for (var i = 0; i < this.activeGuilds.length; i++) serversNames.push(this.activeGuilds[i].name);
-				message.channel.send(compose("I'm active in %1 server(s): %2.", serversNames.length, serversNames.join(', ')));
+				message.channel.send(this.compose("I'm active in %1 server(s): %2.", serversNames.length, serversNames.join(', ')));
 				break;
 			}
 		}
@@ -613,12 +656,12 @@ class GalaxyBot {
 
 		// If bot is mentioned, send information about help command.
 		if (message.author != this.client.user && message.content.indexOf(this.client.user.id) >= 0) {
-			message.channel.send(compose('<@%1>, need help with anything? Type **%2help** to see my commands! :raised_hands:', message.author.id, this.config.prefix));
+			message.channel.send(this.compose('<@%1>, need help with anything? Type **%2help** to see my commands! :raised_hands:', message.author.id, this.config.prefix));
 		}
 
 		// Reddit, pretty much.
 		else if (message.content.toLowerCase() == 'good bot') {
-			message.channel.send(compose('Thank you, <@%1>! :heart:', message.author.id));
+			message.channel.send(this.compose('Thank you, <@%1>! :heart:', message.author.id));
 		}
 		
 		else if (message.content.toLowerCase() == 'bad bot') {
