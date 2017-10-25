@@ -45,33 +45,14 @@ function compose() {
 class GalaxyBot {
 	constructor() {
 		this.client = new Discord.Client();
-		this.client.on('ready', () => { this.onLaunch(); });
+		this.client.on('ready', () => { this.onReady(); });
 		this.client.on('message', message => { this.onMessage(message); });
 		this.client.on('channelDelete', channel => { this.onChannelDeleted(channel); });
+		this.client.on('guildMemberRemove', member => { this.onMemberRemoved(member); })
 		this.activeGuilds = [];
 	}
 
-	init() {
-		this.log(false, 'Initializing GalaxyBot...');
-
-		// Load YAML config.
-		try {
-			this.config = yaml.safeLoad(fs.readFileSync('./config.yml', 'utf8'));
-		}
-		catch (e) { console.log(e); }
-
-		// Possible config file exceptions.
-		if (!this.config) console.log("Configuration error: config.yml not found or empty!");
-		else if (!this.config.token) console.log("Configuration error: 'token' is not specified in config.yml!");
-		
-		// Log in to Discord.
-		this.client.login(this.config.token);
-	}
-
-	onLaunch() {
-		this.log(false, 'GalaxyBot is ready!');
-		this.setGame('with Dommy');
-	}
+	
 
 	removeMPformat(string) {
 		var output = '';
@@ -128,10 +109,6 @@ class GalaxyBot {
 		this.client.user.setPresence({game: {name: name}});
 	}
 
-	resetGame() {
-		this.setGame('');
-	}
-
 	// ------------------- ^^^ CLEAN THIS UP FFS ^^^ ------------------- //
 
 	/**
@@ -145,6 +122,38 @@ class GalaxyBot {
 		var guildName = 'GLOBAL';
 		if (botGuild) guildName = botGuild.name;
 		console.log('['+time+'] ['+guildName+'] ' + text);
+	}
+
+	/**
+	 * Start the GalaxyBot.
+	 */
+	start() {
+		this.log(false, 'Initializing GalaxyBot...');
+
+		// Load YAML config.
+		try {
+			this.config = yaml.safeLoad(fs.readFileSync('./config.yml', 'utf8'));
+		}
+		catch (e) { console.log(e); }
+
+		// Config file not found.
+		if (!this.config) {
+			console.log("Configuration error: config.yml not found or empty!");
+		}
+		// Discord token not specified.
+		else if (!this.config.discord || !this.config.discord.token) {
+			console.log("Configuration error: Discord token is not specified in config.yml!");
+		}
+		
+		// Log in to Discord.
+		else this.client.login(this.config.discord.token);
+	}
+
+	/**
+	 * Fired when GalaxyBot is ready for action.
+	 */
+	onReady() {
+		this.log(false, 'GalaxyBot is ready!');
 	}
 
 	/**
@@ -265,7 +274,8 @@ class GalaxyBot {
 	 * @param {String} url - The URL of the track source.
 	 */
 	onTrackCreated(botGuild, track, member, url) {
-		if (!botGuild || !member || !member.voiceChannel) return;
+		if (!botGuild || !member) return;
+		if (!botGuild.voiceConnection && !member.voiceChannel) return;
 
 		// (Let's just ignore the fact we're in 'onTrackCreated' method) Track not created.
 		if (!track) {
@@ -293,6 +303,7 @@ class GalaxyBot {
 
 		// Queue new track.
 		botGuild.tracksQueue.push(track);
+		this.log(botGuild, 'Track successfully added: ' + track.title);
 
 		// Create voice connection for current guild, if doesn't exist.
 		if (!botGuild.voiceConnection) {
@@ -350,6 +361,7 @@ class GalaxyBot {
 					"**%2servers <galaxy|pursuit|stadium>** - Listing max. 10 servers of a specific title.\n" +
 					"\nMusic player\n" +
 					"**%2play <url>** - I'm gonna join your voice channel and play the song for you!\n" +
+					"**%2undo** - If you requested wrong song, remove it using this command.\n" +
 					"**%2now** - I will tell you what song (and if) I'm currently playing.\n" +
 					"**%2next** - If there's something next in the queue, I'll tell you what it is!\n" +
 					"**%2queue** - I will inform you what are the 10 upcoming songs!\n" +
@@ -446,12 +458,17 @@ class GalaxyBot {
 			case 'skip' : {
 				botGuild.lastTextChannel = message.channel;
 
-				if (!this.hasControlOverBot(message.member)) {
-					message.channel.send('You are not permitted to skip currently played track. :no_good:');
+				// Not playing anything in the server.
+				if (!botGuild.currentTrack) {
+					message.channel.send('Nothing is being played right now. :shrug:');
 					return;
 				}
 
-				if (!botGuild.currentTrack) return;
+				// No permission to skip current track.
+				if (!this.hasControlOverBot(message.member) && message.member != botGuild.currentTrack.sender) {
+					message.channel.send('You are not permitted to skip tracks requested by other users. :no_good:');
+					return;
+				}
 
 				message.channel.send('Allright, skipping current track! :thumbsup:');
 				this.log(botGuild, 'Current track skipped through command.');
@@ -478,6 +495,38 @@ class GalaxyBot {
 				if (botGuild.voiceConnection) botGuild.voiceConnection.channel.leave();
 				if (botGuild.voiceDispatcher) botGuild.voiceDispatcher.end();
 
+				break;
+			}
+
+			// Remove latest track added by the user.
+			case 'undo' : {
+				botGuild.lastTextChannel = message.channel;
+
+				// Tracks queue is empty.
+				if (botGuild.tracksQueue.length <= 0) {
+					message.channel.send('Tracks queue is empty. :shrug:');
+					return;
+				}
+
+				// Get the latest track queued by user.
+				var trackToRemove = false;
+				for (var i = botGuild.tracksQueue.length - 1; i >= 0; i--) {
+					var track = botGuild.tracksQueue[i];
+					console.log(track.title);
+					if (track.sender != message.member) continue;
+					trackToRemove = track;
+					break;
+				}
+
+				// No track found.
+				if (!trackToRemove) {
+					message.channel.send('Looks like there are no upcoming tracks requested by you. :thinking:');
+					return;
+				}
+
+				// Remove latest track.
+				message.channel.send(compose('<@%1>, I removed your latest track, **%2**.', message.member.id, trackToRemove.title));
+				botGuild.tracksQueue.splice(botGuild.tracksQueue.indexOf(trackToRemove), 1);
 				break;
 			}
 
@@ -511,13 +560,13 @@ class GalaxyBot {
 				}
 
 				// Can't search in YouTube: API token not provided.
-				else if (!this.config.youtube.token) {
-					message.channel.send('You need to be in a voice channel. :loud_sound:');
-					this.log(botGuild, 'User not in a voice channel.');
+				else if (!this.config.youtube || !this.config.youtube.token) {
+					message.channel.send("I can't search for tracks in YouTube, API token is missing in my configuration file! :rolling_eyes:");
+					this.log(botGuild, 'Wrong YouTube configuration: token not specified.');
 					break;
 				}
 
-				// Search for the song in YouTube.
+				// Search for the something in YouTube.
 				else {
 					var options = {
 						maxResults: 1,
@@ -608,6 +657,24 @@ class GalaxyBot {
 			if (guild.voiceConnection) guild.voiceConnection.channel.leave();
 			if (guild.voiceDispatcher) guild.voiceDispatcher.end();
 		}
+	}
+
+	/**
+	 * When user is kicked from a server.
+	 * Note: Not sure if it's working properly yet.
+	 *
+	 * @param {GuildMember} member - The member who's no longer a member. :kappa:
+	 */
+	onMemberRemoved(member) {
+		if (!member || member.id != this.client.user.id) return;
+		var botGuild = this.getBotGuild(member.guild);
+		if (!botGuild) return;
+
+		// We've been kicked from the server.
+		this.log('Kicked from guild: ' + botGuild.name);
+		if (botGuild.voiceConnection) botGuild.voiceConnection.channel.leave();
+		if (botGuild.voiceDispatcher) botGuild.voiceDispatcher.end();
+		this.activeGuilds.splice(botGuild, 1);
 	}
 }
 
