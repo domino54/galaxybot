@@ -20,22 +20,24 @@ class Track {
 		this.url = url;
 		this.author = 'Unknown';
 		this.title = 'Unknown';
+		this.description = '';
 		this.thumbnail = '';
 		this.duration = 0;
 		this.color = 0x000000;
+		this.isLivestream = false;
 		this.embed = null;
 
 		var hostname = URL.parse(url).hostname;
 		if (!hostname) callback(false);
 
 		// YouTube
-		else if (hostname.toLowerCase().indexOf('youtube') >= 0) this.loadYouTube(callback);
+		else if (url.match(/(youtube\.com\/watch\?v=|youtu\.be\/)/)) this.loadYouTube(callback);
 
 		// Streamable
-		else if (hostname.toLowerCase().indexOf('streamable') >= 0) this.loadStreamable(callback);
+		else if (url.match(/(streamable\.com)\/([a-z0-9]{5})/)) this.loadStreamable(callback);
 
 		// Unknown.
-		else callback(false);
+		else callback('unsupported');
 	}
 
 	/**
@@ -46,6 +48,7 @@ class Track {
 	loadYouTube(callback) {
 		try {
 			this.stream = ytdl(this.url, {filter: 'audioonly'}); ///< TODO: Fix livestreams crashing the whole bot.
+			//this.stream = ytdl(this.url); ///< Rest in peace network connection.
 			this.stream.on("info", (info, format) => {
 				if (!format) {
 					callback(false);
@@ -58,9 +61,11 @@ class Track {
 					icon_url: info.author.avatar
 				}
 				this.title = info.title;
-				this.thumbnail = info.thumbnail_url;
+				this.description = info.description;
+				this.thumbnail = 'http://img.youtube.com/vi/'+info.video_id+'/mqdefault.jpg';;
 				this.duration = info.length_seconds;
 				this.color = 0xCC181E;
+				this.isLivestream = info.live_playback;
 				this.embed = this.createEmbed();
 
 				callback(this);
@@ -77,8 +82,9 @@ class Track {
 	 * @param {Function} callback - Function to call when Streamable info is obtained.
 	 */
 	loadStreamable(callback) {
-		var temp = this.url.split('/');
-		var videoURL = 'https://api.streamable.com/videos/' + temp[temp.length-1];
+		var explode = this.url.split('/');
+		var videoURL = 'https://api.streamable.com/videos/' + explode.pop();
+		console.log(videoURL);
 
 		var request = HTTPS.get(videoURL, response => {
 			var body = '';
@@ -97,7 +103,7 @@ class Track {
 					this.sourceURL = 'https:' + file.url;
 					this.title = info.title;
 					this.thumbnail = 'https:' + info.thumbnail_url;
-					this.duration = parseInt(file.duration);
+					this.duration = file.duration;
 					this.color = 0x0F90FA;
 					this.embed = this.createEmbed();
 
@@ -143,7 +149,7 @@ class Track {
 			thumbnail: {
 				url: this.thumbnail
 			},
-			description: this.timeToText(this.duration),
+			description: 'Duration: ' + this.timeToText(parseInt(this.duration)),
 			footer: {
 				text: this.sender.displayName,
 				icon_url: this.sender.user.avatarURL

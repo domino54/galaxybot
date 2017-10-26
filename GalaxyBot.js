@@ -89,7 +89,7 @@ class GalaxyBot {
 		this.client.on('ready', () => { this.onReady(); });
 		this.client.on('message', message => { this.onMessage(message); });
 		this.client.on('channelDelete', channel => { this.onChannelDeleted(channel); });
-		this.client.on('guildMemberRemove', member => { this.onMemberRemoved(member); })
+		this.client.on('guildDelete', guild => { this.onGuildDelete(guild); })
 		this.activeGuilds = [];
 	}
 
@@ -142,6 +142,7 @@ class GalaxyBot {
 	 */
 	onReady() {
 		this.log(false, 'GalaxyBot is ready!');
+		this.client.user.setGame('with Dommy');
 	}
 
 	/**
@@ -179,8 +180,7 @@ class GalaxyBot {
 	 * @returns {Guild} Bot guild object (no matter how stupid it sounds).
 	 */
 	getBotGuild(guild) {
-		for (var i = 0; i < this.activeGuilds.length; i++) {
-			var botGuild = this.activeGuilds[i];
+		for (const botGuild of this.activeGuilds) {
 			if (guild.id == botGuild.id) return botGuild;
 		}
 
@@ -282,7 +282,10 @@ class GalaxyBot {
 		// We are playing something.
 		else {
 			var header = 'Now playing:';
-			if (withMention) header = "I'm playing your track now, <@" + botGuild.currentTrack.sender.id + ">! :metal:";
+			if (withMention) {
+				if (botGuild.currentTrack.isLivestream) header = this.compose("I'm tuned up for the livestream, <@%1>! :red_circle:", botGuild.currentTrack.sender.id);
+				else header = this.compose("I'm playing your track now, <@%1>! :metal:", botGuild.currentTrack.sender.id);
+			}
 			botGuild.lastTextChannel.send(header, botGuild.currentTrack.embed);
 		}
 	}
@@ -294,15 +297,31 @@ class GalaxyBot {
 	 * @param {Track} track - Newly created track.
 	 * @param {GuildMember} member - User, which created the track.
 	 * @param {String} url - The URL of the track source.
+	 * @param {String} param - Play parameter specified after URL.
 	 */
-	onTrackCreated(botGuild, track, member, url) {
+	onTrackCreated(botGuild, track, member, url, param) {
 		if (!botGuild || !member) return;
 		if (!botGuild.voiceConnection && !member.voiceChannel) return;
+		var hasPermissions = this.hasControlOverBot(member);
 
 		// (Let's just ignore the fact we're in 'onTrackCreated' method) Track not created.
 		if (!track) {
 			botGuild.lastTextChannel.send(this.compose("Sorry <@%1>, but I can't play anything from that link. :shrug:", member.id));
 			this.log(botGuild, this.compose('Track %1 not added: no information.', url));
+			return;
+		}
+
+		// Unsupported link type.
+		if (track === 'unsupported') {
+			botGuild.lastTextChannel.send(this.compose("I can't play that link, <@%1>. Make sure you're requesting something from YouTube or Streamable. :rolling_eyes:", member.id));
+			this.log(botGuild, this.compose('Track %1 not added: unsupported host.', url));
+			return;
+		}
+
+		// User without permissions attempts to play livestream.
+		if (track.isLivestream && !hasPermissions) {
+			botGuild.lastTextChannel.send(this.compose("Sorry <@%1>, you don't have permissions to add livestreams. :point_up:", member.id));
+			this.log(botGuild, this.compose('Track %1 not added: no permission to play livestream.'), track.title);
 			return;
 		}
 
@@ -323,9 +342,19 @@ class GalaxyBot {
 			return;
 		}
 
-		// Queue new track.
-		botGuild.tracksQueue.push(track);
 		this.log(botGuild, 'Track successfully added: ' + track.title);
+
+		// Queue new track.
+		var isNext = (param === 'now' || param === 'next') && botGuild.tracksQueue.length > 0;
+		var isNow = param === 'now' && hasPermissions;
+
+		if (isNext && hasPermissions) {
+			if (isNow) botGuild.lastTextChannel.send(this.compose("Okay <@%1>, let's play it right now! :smirk:", member.id));
+			botGuild.tracksQueue.unshift(track);
+		} else {
+			if (isNext) botGuild.lastTextChannel.send(this.compose("Sorry <@%1>, you can't queue track next, nor play it immediately. :rolling_eyes:", member.id));
+			botGuild.tracksQueue.push(track);
+		}
 
 		// Create voice connection for current guild, if doesn't exist.
 		if (!botGuild.voiceConnection) {
@@ -342,9 +371,15 @@ class GalaxyBot {
 
 		// Somehow we are in voice channel, but nothing is being played.
 		else if (!botGuild.currentTrack) this.playNextTrack(botGuild);
+
+		// Play the track right now.
+		else if (isNow && botGuild.voiceDispatcher) botGuild.voiceDispatcher.end();
 		
 		// Show queue message.
-		else botGuild.lastTextChannel.send(this.compose('<@%1>, your track is **#%2** in the queue:', member.id, botGuild.tracksQueue.length), track.embed);
+		else {
+			var position = botGuild.tracksQueue.indexOf(track) + 1;
+			botGuild.lastTextChannel.send(this.compose('<@%1>, your track is **#%2** in the queue:', member.id, position), track.embed);
+		}
 	}
 
 	/**
@@ -440,8 +475,7 @@ class GalaxyBot {
 				if (args[0]) {
 					// Get next track requested by the user.
 					if (args[0] == 'me') {
-						for (var i = 0; i < botGuild.tracksQueue.length; i++) {
-							var track = botGuild.tracksQueue[i];
+						for (const track of botGuild.tracksQueue) {
 							if (track.sender != message.member) continue;
 							message.channel.send(this.compose('Your next track is **#%1** in the queue, <@%2>:', i+1, message.member.id), track.createEmbed());
 							return;
@@ -483,7 +517,7 @@ class GalaxyBot {
 				// List next tracks
 				var tracksInfos = [];
 				for (var i = 0; i < botGuild.tracksQueue.length && i < 10; i++) {
-					var track = botGuild.tracksQueue[i];
+					var track = botGuild.tracksQueue[0];
 					tracksInfos.push(this.compose('`%1.` **%2** (requested by %3)', ((i<9) ? '0' : '') + (i+1), track.title, track.sender.displayName));
 				}
 				message.channel.send('Up next:\n' + tracksInfos.join('\n'));
@@ -548,7 +582,6 @@ class GalaxyBot {
 				var trackToRemove = false;
 				for (var i = botGuild.tracksQueue.length - 1; i >= 0; i--) {
 					var track = botGuild.tracksQueue[i];
-					console.log(track.title);
 					if (track.sender != message.member) continue;
 					trackToRemove = track;
 					break;
@@ -593,12 +626,13 @@ class GalaxyBot {
 				// Create a new track object for the speicifed URL.
 				var url = args[0];
 				var query = args.join(' ');
+
 				this.log(botGuild, this.compose('Track requested by %1: %2', message.member.displayName, query));
 
 				// Try to load track from given URL.
 				if (URL.parse(url).hostname) {
 					var track = new Track(url, message.member, (track) => {
-						this.onTrackCreated(botGuild, track, message.member, url);
+						this.onTrackCreated(botGuild, track, message.member, url, args[1]);
 					});
 				}
 
@@ -619,7 +653,7 @@ class GalaxyBot {
 						if (error) return console.log(error);
 						if (results.length > 0) {
 						 	var track = new Track(results[0].link, message.member, (track) => {
-								this.onTrackCreated(botGuild, track, message.member, url);
+								this.onTrackCreated(botGuild, track, message.member, url, false);
 							});
 						}
 					});
@@ -631,8 +665,10 @@ class GalaxyBot {
 			// List all guilds the bot is active in.
 			case 'guilds' : {
 				var serversNames = [];
-				for (var i = 0; i < this.activeGuilds.length; i++) serversNames.push(this.activeGuilds[i].name);
-				message.channel.send(this.compose("I'm active in %1 server(s): %2.", serversNames.length, serversNames.join(', ')));
+				this.client.guilds.forEach((guild, guildId) => {
+					serversNames.push(guild == message.guild ? '**'+guild.name+'**' : guild.name);
+				});
+				message.channel.send(this.compose("I'm active in **%1** server%2: %3.", this.client.guilds.size, (this.client.guilds.size == 1 ? '' : 's'), serversNames.join(', ')));
 				break;
 			}
 		}
@@ -703,14 +739,13 @@ class GalaxyBot {
 	}
 
 	/**
-	 * When user is kicked from a server.
-	 * Note: Not sure if it's working properly yet.
+	 * When a guild is removed or bot is kicked.
 	 *
-	 * @param {GuildMember} member - The member who's no longer a member. :kappa:
+	 * @param {Guild} guild - The guild we no longer are member of.
 	 */
-	onMemberRemoved(member) {
-		if (!member || member.id != this.client.user.id) return;
-		var botGuild = this.getBotGuild(member.guild);
+	onGuildDelete(guild) {
+		if (!guild) return;
+		var botGuild = this.getBotGuild(guild);
 		if (!botGuild) return;
 
 		// We've been kicked from the server.
