@@ -91,6 +91,7 @@ class GalaxyBot {
 		this.client.on('channelDelete', channel => { this.onChannelDeleted(channel); });
 		this.client.on('guildDelete', guild => { this.onGuildDelete(guild); })
 		this.activeGuilds = [];
+		this.modRoles = [];
 	}
 
 	/**
@@ -135,6 +136,9 @@ class GalaxyBot {
 		
 		// Log in to Discord.
 		else this.client.login(this.config.discord.token);
+
+		// Get the bot roles
+		if (this.config.roles) for (const role of this.config.roles) this.modRoles.push(role.name);
 	}
 
 	/**
@@ -200,8 +204,12 @@ class GalaxyBot {
 	 */
 	hasControlOverBot(member) {
 		if (!member) return false;
-		if (member.id == this.config.dommy || member.hasPermission('ADMINISTRATOR')) return true; ///< I'm the god of this module.
-		// TODO: Add special permissions for bot control.
+		//if (member.id == this.config.dommy || member.hasPermission('ADMINISTRATOR')) return true; ///< I'm the god of this module.
+		
+		member.roles.forEach((role, roleId) => {
+			if (this.modRoles[role.name]) return true;
+		});
+
 		return false;
 	}
 
@@ -552,7 +560,7 @@ class GalaxyBot {
 				botGuild.lastTextChannel = message.channel;
 
 				if (!this.hasControlOverBot(message.member)) {
-					message.channel.send('Only choosen people can stop me. :blush:');
+					message.channel.send(this.compose('Only server administrators and people with at least one of following roles can stop me: %1. :point_up:', this.modRoles.join(', ')));
 					return;
 				}
 
@@ -617,7 +625,7 @@ class GalaxyBot {
 				}
 
 				// User not in our voice channel.
-				if (message.member.voiceChannel != botGuild.voiceConnection.channel && !this.hasControlOverBot(message.member)) {
+				if (botGuild.voiceConnection && message.member.voiceChannel != botGuild.voiceConnection.channel && !this.hasControlOverBot(message.member)) {
 					message.channel.send('You need to join my voice channel if you want to request something. :point_up:');
 					this.log(botGuild, 'User not in voice channel with bot.');
 					break;
