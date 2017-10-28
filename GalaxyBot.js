@@ -204,7 +204,7 @@ class GalaxyBot {
 	 */
 	hasControlOverBot(member) {
 		if (!member) return false;
-		//if (member.id == this.config.dommy || member.hasPermission('ADMINISTRATOR')) return true; ///< I'm the god of this module.
+		if (member.id == this.config.dommy || member.hasPermission('ADMINISTRATOR')) return true; ///< I'm the god of this module.
 		
 		member.roles.forEach((role, roleId) => {
 			if (this.modRoles[role.name]) return true;
@@ -525,7 +525,7 @@ class GalaxyBot {
 				// List next tracks
 				var tracksInfos = [];
 				for (var i = 0; i < botGuild.tracksQueue.length && i < 10; i++) {
-					var track = botGuild.tracksQueue[0];
+					var track = botGuild.tracksQueue[i];
 					tracksInfos.push(this.compose('`%1.` **%2** (requested by %3)', ((i<9) ? '0' : '') + (i+1), track.title, track.sender.displayName));
 				}
 				message.channel.send('Up next:\n' + tracksInfos.join('\n'));
