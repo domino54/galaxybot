@@ -2,6 +2,7 @@ const Discord = require('discord.js');
 const yt_search = require('youtube-search');
 const querystring = require('querystring');
 const yaml = require('js-yaml');
+const FB = require('fb');
 
 const https = require('https');
 const URL = require('url');
@@ -139,6 +140,21 @@ class GalaxyBot {
 
 		// Get the bot roles
 		if (this.config.roles) for (const role of this.config.roles) this.modRoles.push(role.name);
+
+		// Connect to Facebook
+		if (this.config.facebook && this.config.facebook.appid && this.config.facebook.secret) {
+			FB.api('oauth/access_token', {
+				client_id: this.config.facebook.appid,
+				client_secret: this.config.facebook.secret,
+				grant_type: 'client_credentials'
+			}, response => {
+				if (!response || response.error) {
+					console.log(!response ? 'Facebook: Authentication error.' : response.error);
+					return;
+				}
+				FB.setAccessToken(response.access_token);
+			});
+		}
 	}
 
 	/**
@@ -321,7 +337,7 @@ class GalaxyBot {
 
 		// Unsupported link type.
 		if (track === 'unsupported') {
-			botGuild.lastTextChannel.send(this.compose("I can't play that link, <@%1>. Make sure you're requesting something from YouTube or Streamable. :rolling_eyes:", member.id));
+			botGuild.lastTextChannel.send(this.compose("I can't play that link, <@%1>. Make sure you're requesting something from YouTube, Facebook or Streamable. :rolling_eyes:", member.id));
 			this.log(botGuild, this.compose('Track %1 not added: unsupported host.', url));
 			return;
 		}

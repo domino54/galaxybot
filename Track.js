@@ -2,6 +2,7 @@ const Discord = require('discord.js');
 const ytdl = require('ytdl-core');
 const HTTPS = require('https');
 const URL = require('url');
+const FB = require('fb');
 
 /**
  * The Track class.
@@ -18,7 +19,7 @@ class Track {
 	constructor(url, sender, callback) {
 		this.sender = sender;
 		this.url = url;
-		this.author = 'Unknown';
+		this.author = false;
 		this.title = 'Unknown';
 		this.description = '';
 		this.thumbnail = '';
@@ -32,6 +33,9 @@ class Track {
 
 		// YouTube
 		else if (url.match(/(youtube\.com\/watch\?v=|youtu\.be\/)/)) this.loadYouTube(callback);
+
+		// Facebook
+		else if (url.match(/(https:\/\/)?(www\.facebook\.com)\/.*\/videos\/[0-9]+/)) this.loadFacebook(callback);
 
 		// Streamable
 		else if (url.match(/(streamable\.com)\/([a-z0-9]{5})/)) this.loadStreamable(callback);
@@ -77,6 +81,40 @@ class Track {
 	}
 
 	/**
+	 * Get track information from Facebook.
+	 *
+	 * @param {Function} callback - Function to call when Facebook info is obtained.
+	 */
+	loadFacebook(callback) {
+		var temp = this.url.match(/\/videos\/[0-9]+/)[0];
+		var explode = temp.split('/');
+		var videoId = explode.pop();
+
+		FB.api('/'+videoId, { fields: ['source', 'length', 'from', 'title', 'picture', 'live_status'] }, response => {
+			if (!response || response.error) {
+				console.log(!response ? 'Facebook: Error occurred while getting track info.' : response.error);
+				callback(false);
+				return;
+			}
+			
+			this.author = {
+				name: response.from.name,
+				url: 'https://www.facebook.com/' + response.from.id,
+				icon_url: 'http://graph.facebook.com/'+response.from.id+'/picture?type=normal'
+			};
+			this.sourceURL = response.source;
+			this.title = response.title;
+			this.thumbnail = response.picture;
+			this.duration = response.length;
+			this.color = 0x4267B2;
+			this.isLivestream = response.live_status;
+			this.embed = this.createEmbed();
+
+			callback(this);
+		});
+	}
+
+	/**
 	 * Get video information from Streamable.
 	 *
 	 * @param {Function} callback - Function to call when Streamable info is obtained.
@@ -84,15 +122,17 @@ class Track {
 	loadStreamable(callback) {
 		var explode = this.url.split('/');
 		var videoURL = 'https://api.streamable.com/videos/' + explode.pop();
-		console.log(videoURL);
-
-		var request = HTTPS.get(videoURL, response => {
+		
+		HTTPS.get(videoURL, response => {
 			var body = '';
 			response.on('data', (data) => { body += data; })
 			response.on('end', () => {
 				try {
 					var info = JSON.parse(body);
-					if (!info.files['mp4-mobile']) return callback(false);
+					if (!info.files['mp4-mobile']) {
+						callback(false);
+						return;
+					}
 					var file = info.files['mp4-mobile'];
 
 					this.author = {

@@ -1,10 +1,16 @@
-token:      your_token_here
 prefix:     '!'
 maxlength:  600
 dommy:      99612832353505280
 
+discord:
+  token:  your_token_here
+
 youtube:
   token:  your_token_here
+
+facebook:
+  appid:  your_application_id
+  secret: your_application_secret
 
 roles:
   - name: GalaxyBot

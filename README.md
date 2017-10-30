@@ -12,7 +12,9 @@ All available commands of the GalaxyBot. `!command <mandatory> [optional]`
 * `!guilds` - Lists all servers the bot is currently in.
 
 ### Music player
-* `!play <url|query> [now|next]` - Connects to a voice channel and plays audio from given link. If something different than URL is given, bot will search YouTube and play first result.
+Supported platforms are: YouTube, Facebook, Streamable.
+
+* `!play <url|query> [now|next]` - Connects to a voice channel and plays audio from given link. If something different than URL is given, bot will search YouTube and play first result. `now` and `next` allow administrators to play the track instantly or insert it at the beginning of the queue.
 * `!undo` - Removes latest track added by the user.
 * `!now` - Shows what is currently being played.
 * `!next [me|order]` - Shows name of the next track in the queue. `me` shows upcoming song requested by the user. `order` can tell what song is at specific queue position.
