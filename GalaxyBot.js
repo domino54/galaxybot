@@ -311,7 +311,7 @@ class GalaxyBot {
 		}
 
 		// DES-PA-CITO.
-		if (track.title.toLowerCase().indexOf('despacito') >= 0) {
+		if (track.title && track.title.toLowerCase().indexOf('despacito') >= 0) {
 			botGuild.lastTextChannel.send('Anything related to "Despacito" is FUCKING BLACKLISTED. :middle_finger:');
 			this.log(botGuild, this.compose('Track %1 not added: blacklisted.', url));
 			return;
@@ -376,6 +376,7 @@ class GalaxyBot {
 		// Register new server if not registered yet.
 		var botGuild = this.getBotGuild(message.guild);
 		botGuild.name = message.guild.name;
+		botGuild.lastTextChannel = message.channel;
 
 		// Log command.
 		this.log(botGuild, this.compose('Command sent by %1: %2', message.member.displayName, name));
@@ -416,14 +417,13 @@ class GalaxyBot {
 
 			// Send servers list of a specific title.
 			case 'servers' : {
-				botGuild.lastTextChannel = message.channel;
-
 				// Title id not specified.
 				if (args.length <= 0) {
 					message.channel.send(this.compose(
 						'<@%1>, you need to specify `titleUid` in this command. Type `titleUid` after command or use one of these short codes: %2.',
 						message.member.id, this.maniaplanet.getTitleCodes().join(', ')
 					));
+					this.log(botGuild, 'No UID specified.');
 					return;
 				}
 
@@ -438,40 +438,78 @@ class GalaxyBot {
 				break;
 			}
 
+			// Show info about a title.
 			case 'title' : {
-				botGuild.lastTextChannel = message.channel;
-
 				// Title id not specified.
 				if (args.length <= 0) {
 					message.channel.send(this.compose(
 						'<@%1>, you need to specify `titleUid` in this command. Type `titleUid` after command or use one of these short codes: %2.',
 						message.member.id, this.maniaplanet.getTitleCodes().join(', ')
 					));
+					this.log(botGuild, 'No UID specified.');
 					return;
 				}
 
 				// Get title id.
 				var titleUid = args[0];
 				titleUid = this.maniaplanet.getTitleUid(titleUid);
+				this.showTitleInfo(botGuild, titleUid);
+				break;
+			}
 
-				this.maniaplanet.title(titleUid, title => {
-					this.onTitleInfo(botGuild, title);
-				});
+			// Show info about a map.
+			case 'map' : {
+				// Map UID not specified.
+				if (args.length <= 0) {
+					message.channel.send(this.compose('<@%1>, you need to specify the map `UID` in this command.', message.member.id));
+					this.log(botGuild, 'No UID specified.');
+					return;
+				}
 
+				this.showMapInfo(botGuild, args[0]);
+				break;
+			}
+
+			// Show current program live in a channel.
+			case 'channel' : {
+				// Which channel?
+				if (args.length <= 0) {
+					message.channel.send(this.compose('<@%1>, I need to know if you mean `sm` or `tm` channel. :thinking:', message.member.id));
+					this.log(botGuild, 'No channel specified.');
+					return;
+				}
+
+				// Get channel.
+				var channelId = '';
+				switch (args[0]) {
+					case 'sm' : {
+						channelId = 'shootmania';
+						break;
+					}
+					case 'tm' : {
+						channelId = 'trackmania';
+						break;
+					}
+					// Unknown.
+					default : {
+						message.channel.send(this.compose('<@%1>, currently there are only two channels: `sm` and `tm`. :shrug:', message.member.id));
+						this.log(botGuild, 'Unknown channel.');
+						return;
+					}
+				}
+
+				this.showCurrentEpisode(botGuild, channelId);
 				break;
 			}
 
 			// Show the user currently played track.
 			case 'now' : {
-				botGuild.lastTextChannel = message.channel;
-				this.nowPlaying(botGuild, false);
+				this.nowPaying(botGuild, false);
 				break;
 			}
 
 			// Show the user next track in the queue.
 			case 'next' : {
-				botGuild.lastTextChannel = message.channel;
-
 				// Nothing next in the queue.
 				if (botGuild.tracksQueue.length <= 0) {
 					message.channel.send('The queue is empty. Go ahead and request some beats! :butterfly:');
@@ -514,8 +552,6 @@ class GalaxyBot {
 
 			// List max. 10 upcoming tracks.
 			case 'queue' : {
-				botGuild.lastTextChannel = message.channel;
-
 				// Nothing next in the queue.
 				if (botGuild.tracksQueue.length <= 0) {
 					message.channel.send('The queue is empty. Go ahead and request some beats! :butterfly:');
@@ -534,8 +570,6 @@ class GalaxyBot {
 
 			// Skip currently played track.
 			case 'skip' : {
-				botGuild.lastTextChannel = message.channel;
-
 				// Not playing anything in the server.
 				if (!botGuild.currentTrack) {
 					message.channel.send('Nothing is being played right now. :shrug:');
@@ -557,8 +591,6 @@ class GalaxyBot {
 
 			// Stop everything.
 			case 'stop' : {
-				botGuild.lastTextChannel = message.channel;
-
 				if (!this.hasControlOverBot(message.member)) {
 					message.channel.send(this.compose('Only server administrators and people with at least one of following roles can stop me: %1. :point_up:', this.modRoles.join(', ')));
 					return;
@@ -578,8 +610,6 @@ class GalaxyBot {
 
 			// Remove latest track added by the user.
 			case 'undo' : {
-				botGuild.lastTextChannel = message.channel;
-
 				// Tracks queue is empty.
 				if (botGuild.tracksQueue.length <= 0) {
 					message.channel.send('Tracks queue is empty. :shrug:');
@@ -609,8 +639,6 @@ class GalaxyBot {
 
 			// Request bot to play a song.
 			case 'play' : {
-				botGuild.lastTextChannel = message.channel;
-
 				// URL not specified
 				if (args.length <= 0) {
 					message.channel.send('First of all, you need to tell me what should I play. :shrug:');
@@ -703,6 +731,44 @@ class GalaxyBot {
 			message.channel.send(this.compose('<@%1>, need help with anything? Type **%2help** to see my commands! :raised_hands:', message.author.id, this.config.prefix));
 		}
 
+		// Check if message contains something about ManiaPlanet.
+		else if (message.content.toLowerCase().indexOf('maniaplanet') >= 0) {
+			if (!message.member) return;
+
+			var explode = message.content.split('/');
+			var botGuild = this.getBotGuild(message.guild);
+			botGuild.name = message.guild.name;
+			botGuild.lastTextChannel = message.channel;
+
+			// Link to a title page.
+			if (message.content.match(/maniaplanet\.com\/titles\/\w+@\w+/)) {
+				var titleUid = '';
+
+				for (var i = explode.length - 1; i >= 0; i--) {
+					var part = explode[i];
+					if (part.indexOf('@') < 0) continue;
+					titleUid = part;
+					break;
+				}
+
+				if (titleUid) this.showTitleInfo(botGuild, titleUid);
+			}
+
+			// Link to a map page.
+			else if (message.content.match(/maniaplanet\.com\/maps\/[A-Za-z0-9]+/)) {
+				var mapUid = '';
+				var prevWasMaps = false;
+
+				for (var i = 0; i < explode.length; i++) {
+					var part = explode[i];
+					if (prevWasMaps) { mapUid = part; break; }
+					prevWasMaps = part == 'maps';
+				}
+
+				if (mapUid) this.showMapInfo(botGuild, mapUid);
+			}
+		}
+
 		// Reddit, pretty much.
 		else if (message.content.toLowerCase() == 'good bot') {
 			message.channel.send(this.compose('Thank you, <@%1>! :heart:', message.author.id));
@@ -718,7 +784,7 @@ class GalaxyBot {
 		}
 
 		// Markiel.
-		if (message.content.toLowerCase().indexOf('markiel') >= 0) {
+		else if (message.content.toLowerCase().indexOf('markiel') >= 0) {
 			message.react('markiel:258199535673671680');
 			message.channel.send({files: ['./markiel.png']});
 		}
@@ -778,6 +844,7 @@ class GalaxyBot {
 			// Title not found.
 			if (!title || title.code == 404) {
 				botGuild.lastTextChannel.send(this.compose("Sorry, I can't recognize the **%1** title... :shrug:", titleUid));
+				this.log(botGuild, 'Title not found: ' + titleUid);
 				return;
 			}
 
@@ -786,6 +853,7 @@ class GalaxyBot {
 			// No servers were found.
 			if (servers.length <= 0) {
 				botGuild.lastTextChannel.send(this.compose('Looks like there are no online servers in **%1** right now. :rolling_eyes:', titleName));
+				this.log(botGuild, 'No servers found in title: ' + titleUid);
 				return;
 			}
 
@@ -813,23 +881,113 @@ class GalaxyBot {
 		});
 	}
 
-	onTitleInfo(botGuild, title) {
-		if (!botGuild) return;
+	/**
+	 * Show information box about specific title.
+	 *
+	 * @param {Guild} botGuild - The guild to send title information to.
+	 * @param {String} titleUid - UID of the title to display.
+	 */
+	showTitleInfo(botGuild, titleUid) {
+		if (!botGuild || !titleUid) return;
+		this.log(botGuild, 'Downloading title info: ' + titleUid);
 
-		// Title not found.
-		if (!title || title.code == 404) {
-			botGuild.lastTextChannel.send(this.compose("Sorry, I can't recognize the **%1** title... :shrug:", titleUid));
-			return;
-		}
+		this.maniaplanet.title(titleUid, title => {
+			// Title not found.
+			if (!title || title.code == 404) {
+				botGuild.lastTextChannel.send(this.compose("Sorry, I can't recognize the **%1** title... :shrug:", titleUid));
+				this.log(botGuild, 'Title not found: ' + titleUid);
+				return;
+			}
 
-		var embed = new Discord.RichEmbed({
-			title: title.name,
-			image: {
-				url: title.card_url
-			},
-			description: title.description
+			// Title cost in Planets.
+			var fields = [];
+			if (title.cost && title.cost > 0) fields.push({ name: 'Cost', value: title.cost });
+
+			var embed = new Discord.RichEmbed({
+				title: this.maniaplanet.stripFormatting(title.name),
+				url: 'https://www.maniaplanet.com/titles/' + title.uid,
+				image: { url: title.card_url },
+				description: this.maniaplanet.stripFormatting(title.description),
+				fields: fields
+			});
+
+			botGuild.lastTextChannel.send(embed);
+			this.log(botGuild, 'Successfully sent title info: ' + titleUid);
 		});
-		botGuild.lastTextChannel.send(embed);
+	}
+
+	/**
+	 * Show information box about specific map.
+	 *
+	 * @param {Guild} botGuild - The guild to send map information to.
+	 * @param {String} mapUid - UID of the map to display.
+	 */
+	showMapInfo(botGuild, mapUid) {
+		if (!botGuild || !mapUid) return;
+		this.log(botGuild, 'Downloading map info: ' + mapUid);
+
+		this.maniaplanet.map(mapUid, map => {
+			// Map not found.
+			if (!map || map.code == 404) {
+				botGuild.lastTextChannel.send(this.compose("Sorry, I couldn't find information about this map: **%1**. :cry:", mapUid));
+				this.log(botGuild, 'Map not found: ' + mapUid);
+				return;
+			}
+
+			var embed = new Discord.RichEmbed({
+				title: this.maniaplanet.stripFormatting(map.name),
+				url: 'https://www.maniaplanet.com/maps/' + map.uid,
+				image: { url: map.thumbnail_url },
+				author: {
+					name: map.author_login,
+					url: 'https://www.maniaplanet.com/players/' + map.author_login
+				},
+				description:
+					'[**Play**](maniaplanet://www.maniaplanet.com/maps/'+map.uid+'/code/play) | ' +
+					'[**Download**]('+map.download_url+')'
+			});
+
+			botGuild.lastTextChannel.send(embed);
+			this.log(botGuild, 'Successfully sent map info: ' + mapUid);
+		});
+	}
+
+	/**
+	 * Show current episode played in channel.
+	 *
+	 * @param {Guild} botGuild - Guild to send current episode info.
+	 * @param {String} channelId - ID of the channel to get current episode.
+	 */
+	showCurrentEpisode(botGuild, channelId) {
+		if (!botGuild || !mapUid) return;
+		this.log(botGuild, 'Downloading current channel episode: ' + channelId);
+
+		var endtime = parseInt(Date.now() / 1000);
+		var starttime = endtime - 9000;
+
+		this.maniaplanet.episodes(channelId, starttime, endtime, episodes => {
+			// No episodes found.
+			if (!episodes || episodes.code || episodes.length <= 0) {
+				botGuild.lastTextChannel.send("There's nothing being played in this channel righ now, or we ran into some issue. :thinking:");
+				this.log(botGuild, 'Channel empty or request error: ' + channelId);
+				return;
+			}
+
+			var episode = episodes.pop();
+			var embed = new Discord.RichEmbed({
+				title: this.maniaplanet.stripFormatting(episode.program.name),
+				url: 'https://www.maniaplanet.com/programs/' + episode.program.id,
+				description: this.maniaplanet.stripFormatting(episode.program.description),
+				author: {
+					name: this.maniaplanet.stripFormatting(episode.program.author.nickname),
+					url: 'https://www.maniaplanet.com/players/' + episode.program.author.login
+				},
+				image: { url: episode.program.image_url }
+			});
+
+			botGuild.lastTextChannel.send(embed);
+			this.log(botGuild, 'Successfully sent current episode: ' + channelId);
+		});
 	}
 }
 

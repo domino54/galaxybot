@@ -23,4 +23,11 @@ Supported platforms are: YouTube, Facebook, Streamable.
 * `!stop` - Allows administrators to stop music playback and clear the queue.
 
 ### ManiaPlanet
-* `!servers [galaxy|pursuit|stadium]` - Listing up to 10 most populated servers of a specific ManiaPlanet title.
+Bot automatically reacts to ManiaPlanet titles and maps links.
+
+* `!channel <sm|tm>` - See what's currently being played on channels.
+* `!servers <id|code>` - Listing up to 10 most populated servers of a specific ManiaPlanet title.
+* `!title <id|code>` - Shows information about given title from ManiaPlanet website.
+* `!map <uid>` - Shows information about given map from ManiaPlanet website.
+
+Instead of using title `id` in commands you can use cone of following short codes: canyon, storm, stadium, valley, lagoon, galaxy, pursuit, pursuit-s, royal, siege, battle, elite, combo, joust, warlords, heroes, tm2, competition, rpg, obstacle, stormuim, infection, speedball.

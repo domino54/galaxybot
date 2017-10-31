@@ -3,7 +3,7 @@ const querystring= require('querystring');
 const hostname = 'v4.live.maniaplanet.com';
 
 // For formatting strip: ManiaPlanet formatting codes.
-const formatSkip1 = ['g', 'h', 'i', 'l', 'm', 'n', 'o', 'p', 's', 't', 'w', 'z'];
+const formatSkip1 = ['g', 'h', 'i', 'l', 'm', 'n', 'o', 'p', 's', 't', 'w', 'z', '<', '>'];
 const formatSkip3 = ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'a', 'b', 'c', 'd', 'e', 'f'];
 
 // Common titles short codes.
@@ -14,8 +14,8 @@ const commonTitles = {
 	'valley': 'TMValley@nadeo',
 	'lagoon': 'TMLagoon@nadeo',
 	'galaxy': 'GalaxyTitles@domino54',
-	'pursuit': 'PursuitStadium@domino54',
-	'multi': 'Pursuit@domino54',
+	'pursuit': 'Pursuit@domino54',
+	'pursuit-s': 'PursuitStadium@domino54',
 	'royal': 'SMStormRoyal@nadeolabs',
 	'siege': 'SMStormSiege@nadeolabs',
 	'battle': 'SMStormBattle@nadeolabs',
@@ -81,6 +81,34 @@ class ManiaPlanet {
 			response.on('data', data => { body += data; });
 			response.on('end', () => { callback(body); });
 			response.on('error', error => { console.log(error); });
+		});
+	}
+
+	/**
+	 * Get channel episodes list.
+	 *
+	 * @param {String} channelId - ID of the channel to get episodes.
+	 * @param {Number} startDate - Episodes list start timestamp.
+	 * @param {Number} endDate - Episodes list end timestamp.
+	 * @param {Function} callback - Function to call when request is finished.
+	 */
+	episodes(channelId, startDate, endDate, callback) {
+		this.httpsGet('channels/'+channelId+'/episodes', { 'start_date': startDate, 'end_date': endDate }, body => {
+			var result = JSON.parse(body);
+			callback(result);
+		});
+	}
+
+	/**
+	 * Obtain map information.
+	 *
+	 * @param {String} mapUid - UID of the map to get information.
+	 * @param {Function} callback - Function to call when request is finished.
+	 */
+	map(mapUid, callback) {
+		this.httpsGet('maps/'+mapUid, null, body => {
+			var result = JSON.parse(body);
+			callback(result);
 		});
 	}
 
