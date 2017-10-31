@@ -428,13 +428,36 @@ class GalaxyBot {
 				}
 
 				// Get title id.
-				var titleId = args[0];
-				titleId = this.maniaplanet.getTitleUid(titleId);
+				var titleUid = args[0];
+				titleUid = this.maniaplanet.getTitleUid(titleUid);
 				
-				this.maniaplanet.servers({'titleUids[]': titleId, length: 11}, result => {
-					this.serversList(botGuild, result, titleId);
+				this.maniaplanet.servers({'titleUids[]': titleUid, length: 11}, result => {
+					this.serversList(botGuild, result, titleUid);
 				});
-				this.log(botGuild, 'Checking servers of ' + titleId);
+				this.log(botGuild, 'Checking servers of ' + titleUid);
+				break;
+			}
+
+			case 'title' : {
+				botGuild.lastTextChannel = message.channel;
+
+				// Title id not specified.
+				if (args.length <= 0) {
+					message.channel.send(this.compose(
+						'<@%1>, you need to specify `titleUid` in this command. Type `titleUid` after command or use one of these short codes: %2.',
+						message.member.id, this.maniaplanet.getTitleCodes().join(', ')
+					));
+					return;
+				}
+
+				// Get title id.
+				var titleUid = args[0];
+				titleUid = this.maniaplanet.getTitleUid(titleUid);
+
+				this.maniaplanet.title(titleUid, title => {
+					this.onTitleInfo(botGuild, title);
+				});
+
 				break;
 			}
 
@@ -745,16 +768,16 @@ class GalaxyBot {
 	 *
 	 * @param {Guild} botGuild - The guild command was executed in.
 	 * @param {Object} servers - ManiaPlanet servers list.
-	 * @param {String} titleId - Id of the title.
+	 * @param {String} titleUid - Id of the title.
 	 */
-	serversList(botGuild, servers, titleId) {
+	serversList(botGuild, servers, titleUid) {
 		this.log(botGuild, 'Obtained servers list.');
-		this.maniaplanet.titles(titleId, title => {
+		this.maniaplanet.title(titleUid, title => {
 			this.log(botGuild, 'Obtained title information.');
 
 			// Title not found.
 			if (!title || title.code == 404) {
-				botGuild.lastTextChannel.send(this.compose("Sorry, I can't recognize the **%1** title... :shrug:", titleId));
+				botGuild.lastTextChannel.send(this.compose("Sorry, I can't recognize the **%1** title... :shrug:", titleUid));
 				return;
 			}
 
@@ -786,8 +809,27 @@ class GalaxyBot {
 
 			var embed = '```'+serversInfo.join('\n')+'```';
 			botGuild.lastTextChannel.send(messageHeader + embed);
-			this.log(botGuild, this.compose('Found %1 servers in %2', servers.length, titleId));
+			this.log(botGuild, this.compose('Found %1 servers in %2', servers.length, titleUid));
 		});
+	}
+
+	onTitleInfo(botGuild, title) {
+		if (!botGuild) return;
+
+		// Title not found.
+		if (!title || title.code == 404) {
+			botGuild.lastTextChannel.send(this.compose("Sorry, I can't recognize the **%1** title... :shrug:", titleUid));
+			return;
+		}
+
+		var embed = new Discord.RichEmbed({
+			title: title.name,
+			image: {
+				url: title.card_url
+			},
+			description: title.description
+		});
+		botGuild.lastTextChannel.send(embed);
 	}
 }
 

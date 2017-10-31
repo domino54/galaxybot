@@ -98,12 +98,12 @@ class ManiaPlanet {
 	}
 
 	/**
-	 * Obtain online servers list.
+	 * Obtain title information.
 	 *
 	 * @param {String} titleUid - UID of the title to get information.
 	 * @param {Function} callback - Function to call when request is finished.
 	 */
-	titles(titleUid, callback) {
+	title(titleUid, callback) {
 		this.httpsGet('titles/'+titleUid, null, body => {
 			var result = JSON.parse(body);
 			callback(result);
