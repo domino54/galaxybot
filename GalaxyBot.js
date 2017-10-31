@@ -959,7 +959,7 @@ class GalaxyBot {
 	 * @param {String} channelId - ID of the channel to get current episode.
 	 */
 	showCurrentEpisode(botGuild, channelId) {
-		if (!botGuild || !mapUid) return;
+		if (!botGuild || !channelId) return;
 		this.log(botGuild, 'Downloading current channel episode: ' + channelId);
 
 		var endtime = parseInt(Date.now() / 1000);
