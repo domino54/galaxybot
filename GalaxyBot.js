@@ -8,80 +8,15 @@ const https = require('https');
 const URL = require('url');
 const fs = require('fs');
 
+// Local classes.
 const Track = require('./Track');
 const Guild = require('./Guild');
+const ManiaPlanet = require('./ManiaPlanet');
 
-// ------------------- vvv CLEAN THIS UP FFS vvv ------------------- //
-
-const maniaplanetWS = 'https://v4.live.maniaplanet.com/webservices/';
-
-const titleIds = {
-	'galaxy': 'GalaxyTitles@domino54',
-	'pursuit': 'Pursuit@domino54',
-	'stadium': 'PursuitStadium@domino54'
-};
-
-const titleNames = {
-	'GalaxyTitles@domino54': 'Galaxy',
-	'Pursuit@domino54': 'Pursuit Multi-environment',
-	'PursuitStadium@domino54': 'Pursuit Stadium'
-}
-
-const formatSkip1 = ['g', 'h', 'i', 'l', 'm', 'n', 'o', 'p', 's', 't', 'w', 'z'];
-const formatSkip3 = ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'a', 'b', 'c', 'd', 'e', 'f'];
-
+/**
+ * The GalaxyBot itself.
+ */
 class GalaxyBot {
-	removeMPformat(string) {
-		var output = '';
-		for (var i = 0; i < string.length; i++) {
-			var char = string[i];
-			if (char != '$') { output += char; continue; }
-			if (i + 1 > string.length) break;
-			var nextChar = string[i+1].toLowerCase();
-			if (formatSkip1.indexOf(nextChar) > -1) i++;
-			if (formatSkip3.indexOf(nextChar) > -1) i += 3;
-		}
-		return output;
-	}
-
-	serversList(channel, titleId) {
-		var url = maniaplanetWS + 'servers/online?' + querystring.stringify({orderBy: 'playerCount', 'titleUids[]': titleId, length: 11});
-		var request = https.get(url, response => {
-			var body = '';
-			response.on('data', data => { body += data; });
-			response.on('end', () => {
-				var result = JSON.parse(body);
-				var titleName = titleNames[titleId];
-
-				// No servers were found.
-				if (result.length <= 0) {
-					channel.send(this.compose('Looks like there are no online servers in **%1** right now. :rolling_eyes:', titleName));
-					return;
-				}
-
-				// List the found servers.
-				var serversInfo = [];
-				for (var i = 0; i < result.length && i < 10; i++) {
-					var server = result[i];
-					serversInfo.push(this.compose('%1. %2/%3 %4', i+1, server['player_count'], server['player_max'], this.removeMPformat(server['name'])));
-				}
-
-				// Servers list header.
-				var messageHeader;
-				switch (result.length) {
-					case 1 : { messageHeader = this.compose('There is **one %1** server online:', titleName); break; }
-					case 11 : { messageHeader = this.compose('There are over **10 %1** servers online:', titleName); break; }
-					default : { messageHeader = this.compose('There are **%1 %2** servers online:', result.length, titleName); break; }
-				}
-
-				var embed = '```'+serversInfo.join('\n')+'```';
-				channel.send(messageHeader + embed);
-			});
-		});
-	}
-
-	// ------------------- ^^^ CLEAN THIS UP FFS ^^^ ------------------- //
-
 	/**
 	 * Creates a new GalaxyBot.
 	 */
@@ -91,6 +26,14 @@ class GalaxyBot {
 		this.client.on('message', message => { this.onMessage(message); });
 		this.client.on('channelDelete', channel => { this.onChannelDeleted(channel); });
 		this.client.on('guildDelete', guild => { this.onGuildDelete(guild); })
+
+		process.on('SIGINT', () => { this.end(); });
+		process.on('SIGTERM', () => { this.end(); });
+		process.on('SIGHUP', () => { this.end(); });
+		process.on('SIGBREAK', () => { this.end(); });
+
+		this.maniaplanet = new ManiaPlanet();
+
 		this.activeGuilds = [];
 		this.modRoles = [];
 	}
@@ -163,6 +106,14 @@ class GalaxyBot {
 	onReady() {
 		this.log(false, 'GalaxyBot is ready!');
 		this.client.user.setGame('with Dommy');
+	}
+
+	/**
+	 * Fired when terminal or console is killed.
+	 */
+	end() {
+		this.client.destroy();
+		process.exit();
 	}
 
 	/**
@@ -465,15 +416,25 @@ class GalaxyBot {
 
 			// Send servers list of a specific title.
 			case 'servers' : {
-				var title = 'galaxy';
-				if (args.length > 0) title = args[0].toLowerCase();
+				botGuild.lastTextChannel = message.channel;
 
-				if (!(title in titleIds)) {
-					message.channel.send(this.compose("Sorry <@%1>, I can't recognize the '%2' title... :shrug:", message.member.id, title));
-					break;
+				// Title id not specified.
+				if (args.length <= 0) {
+					message.channel.send(this.compose(
+						'<@%1>, you need to specify `titleUid` in this command. Type `titleUid` after command or use one of these short codes: %2.',
+						message.member.id, this.maniaplanet.getTitleCodes().join(', ')
+					));
+					return;
 				}
 
-				this.serversList(message.channel, titleIds[title]);
+				// Get title id.
+				var titleId = args[0];
+				titleId = this.maniaplanet.getTitleUid(titleId);
+				
+				this.maniaplanet.servers({'titleUids[]': titleId, length: 11}, result => {
+					this.serversList(botGuild, result, titleId);
+				});
+				this.log(botGuild, 'Checking servers of ' + titleId);
 				break;
 			}
 
@@ -777,6 +738,56 @@ class GalaxyBot {
 		if (botGuild.voiceConnection) botGuild.voiceConnection.channel.leave();
 		if (botGuild.voiceDispatcher) botGuild.voiceDispatcher.end();
 		this.activeGuilds.splice(botGuild, 1);
+	}
+
+	/**
+	 * Create servers list of specific title.
+	 *
+	 * @param {Guild} botGuild - The guild command was executed in.
+	 * @param {Object} servers - ManiaPlanet servers list.
+	 * @param {String} titleId - Id of the title.
+	 */
+	serversList(botGuild, servers, titleId) {
+		this.log(botGuild, 'Obtained servers list.');
+		this.maniaplanet.titles(titleId, title => {
+			this.log(botGuild, 'Obtained title information.');
+
+			// Title not found.
+			if (!title || title.code == 404) {
+				botGuild.lastTextChannel.send(this.compose("Sorry, I can't recognize the **%1** title... :shrug:", titleId));
+				return;
+			}
+
+			var titleName = title.name;
+
+			// No servers were found.
+			if (servers.length <= 0) {
+				botGuild.lastTextChannel.send(this.compose('Looks like there are no online servers in **%1** right now. :rolling_eyes:', titleName));
+				return;
+			}
+
+			// List the found servers.
+			var serversInfo = [];
+			for (var i = 0; i < servers.length && i < 10; i++) {
+				var server = servers[i];
+				serversInfo.push(this.compose(
+					'%1. %2/%3 %4', i+1, server['player_count'], server['player_max'],
+					this.maniaplanet.stripFormatting(server['name'])
+				));
+			}
+
+			// Servers list header.
+			var messageHeader;
+			switch (servers.length) {
+				case 1 : { messageHeader = this.compose('There is **one %1** server online:', titleName); break; }
+				case 11 : { messageHeader = this.compose('There are over **10 %1** servers online:', titleName); break; }
+				default : { messageHeader = this.compose('There are **%1 %2** servers online:', servers.length, titleName); break; }
+			}
+
+			var embed = '```'+serversInfo.join('\n')+'```';
+			botGuild.lastTextChannel.send(messageHeader + embed);
+			this.log(botGuild, this.compose('Found %1 servers in %2', servers.length, titleId));
+		});
 	}
 }
 
