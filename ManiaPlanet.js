@@ -30,7 +30,8 @@ const commonTitles = {
 	'obstacle': 'obstacle@smokegun',
 	'stormuim': 'GEs@guerro',
 	'infection': 'infection@dmark',
-	'speedball': 'SpeedBall@steeffeen'
+	'speedball': 'SpeedBall@steeffeen',
+	'alpine': 'TMOneAlpine@florenzius'
 };
 
 // Write complete ManiaPlanet node SDK?
@@ -132,7 +133,7 @@ class ManiaPlanet {
 	 * @param {Function} callback - Function to call when request is finished.
 	 */
 	title(titleUid, callback) {
-		this.httpsGet('titles/'+titleUid, null, body => {
+		this.httpsGet('../ingame/public/titles/'+titleUid, null, body => {
 			var result = JSON.parse(body);
 			callback(result);
 		});

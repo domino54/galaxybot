@@ -899,16 +899,60 @@ class GalaxyBot {
 				return;
 			}
 
-			// Title cost in Planets.
-			var fields = [];
-			if (title.cost && title.cost > 0) fields.push({ name: 'Cost', value: title.cost });
+			// Punchline and description.
+			var fields = [{
+				name: '"' + this.maniaplanet.stripFormatting(title.punchline) + '"',
+				value: this.maniaplanet.stripFormatting(title.description)
+			}];
 
+			// Title cost in Planets.
+			if (title.cost && title.cost > 0) fields.push({
+				name: 'Cost',
+				value: title.cost + ' Planets',
+				inline: true
+			});
+
+			// Registrations and online players.
+			fields.push({
+				name: 'Registrations',
+				value: title.registrations,
+				inline: true
+			}, {
+				name: 'Players last 24h',
+				value: title.players_last24h,
+				inline: true
+			}, {
+				name: 'Online players',
+				value: title.online_players,
+				inline: true
+			});
+
+			// Title maker.
+			if (title.title_maker_uid) fields.push({
+				name: 'Created with',
+				value: title.title_maker_name,
+				inline: true
+			});
+
+			// Color (3 digit hex > 6 digit hex > decimal).
+			// THIS PART IS UGLY AF.
+			var primary_color = title.primary_color.toString(16);
+			var color = '';
+			for (var i = 0; i < primary_color.length; i++) color += primary_color[i] + primary_color[i];
+			color = parseInt(color, 16);
+
+			// Create embed.
 			var embed = new Discord.RichEmbed({
+				author: {
+					name: this.maniaplanet.stripFormatting(title.author_nickname),
+					url: 'https://www.maniaplanet.com/players/' + title.author_login
+				},
 				title: this.maniaplanet.stripFormatting(title.name),
-				url: 'https://www.maniaplanet.com/titles/' + title.uid,
+				url: title.title_page_url,
+				color: color,
+				fields: fields,
 				image: { url: title.card_url },
-				description: this.maniaplanet.stripFormatting(title.description),
-				fields: fields
+				timestamp: new Date(title.last_update * 1000).toISOString()
 			});
 
 			botGuild.lastTextChannel.send(embed);

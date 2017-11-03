@@ -30,4 +30,10 @@ Bot automatically reacts to ManiaPlanet titles and maps links.
 * `!title <id|code>` - Shows information about given title from ManiaPlanet website.
 * `!map <uid>` - Shows information about given map from ManiaPlanet website.
 
-Instead of using title `id` in commands you can use cone of following short codes: canyon, storm, stadium, valley, lagoon, galaxy, pursuit, pursuit-s, royal, siege, battle, elite, combo, joust, warlords, heroes, tm2, competition, rpg, obstacle, stormuim, infection, speedball.
+Instead of using title `id` in commands you can use cone of following short codes: canyon, storm, stadium, valley, lagoon, galaxy, pursuit, pursuit-s, royal, siege, battle, elite, combo, joust, warlords, heroes, tm2, competition, rpg, obstacle, stormuim, infection, speedball, alpine.
+
+## Screenshots
+
+![Lagoon title card](https://i.imgur.com/7XQVvuE.png)
+![Music player](https://i.imgur.com/SuogF37.png)
+![ShootMania channel](https://i.imgur.com/u9tNQyU.png)
