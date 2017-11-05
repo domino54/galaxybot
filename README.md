@@ -23,12 +23,13 @@ Supported platforms are: YouTube, Facebook, Streamable.
 * `!stop` - Allows administrators to stop music playback and clear the queue.
 
 ### ManiaPlanet
-Bot automatically reacts to ManiaPlanet titles and maps links.
+Bot automatically reacts to ManiaPlanet titles and maps links, as well as Mania Exchange maps links.
 
 * `!channel <sm|tm>` - See what's currently being played on channels.
 * `!servers <id|code>` - Listing up to 10 most populated servers of a specific ManiaPlanet title.
 * `!title <id|code>` - Shows information about given title from ManiaPlanet website.
 * `!map <uid>` - Shows information about given map from ManiaPlanet website.
+* `!mx <tm|sm> <id|query>` - Search for Mania Exchange map by ID or map name.
 
 Instead of using title `id` in commands you can use cone of following short codes: canyon, storm, stadium, valley, lagoon, galaxy, pursuit, pursuit-s, royal, siege, battle, elite, combo, joust, warlords, heroes, tm2, competition, rpg, obstacle, stormuim, infection, speedball, alpine.
 
@@ -37,3 +38,4 @@ Instead of using title `id` in commands you can use cone of following short code
 ![Lagoon title card](https://i.imgur.com/7XQVvuE.png)
 ![Music player](https://i.imgur.com/SuogF37.png)
 ![ShootMania channel](https://i.imgur.com/u9tNQyU.png)
+![Mania Exchange map](https://i.imgur.com/6sLhjAD.png)

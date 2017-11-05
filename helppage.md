@@ -19,3 +19,4 @@ ManiaPlanet
 **%2servers <id|code>** - Listing up to 10 most populated servers of a specific title.
 **%2title <id|code>** - Shows information about given title from ManiaPlanet website.
 **%2map <uid>** - Shows information about given map from ManiaPlanet website.
+**%2mx <tm|sm> <id|query>** - Search for Mania Exchange map by ID or map name.

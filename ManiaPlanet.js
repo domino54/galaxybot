@@ -28,7 +28,7 @@ const commonTitles = {
 	'competition': 'esl_comp@lt_forever',
 	'rpg': 'RPG@tmrpg',
 	'obstacle': 'obstacle@smokegun',
-	'stormuim': 'GEs@guerro',
+	'stormium': 'GEs@guerro',
 	'infection': 'infection@dmark',
 	'speedball': 'SpeedBall@steeffeen',
 	'alpine': 'TMOneAlpine@florenzius'

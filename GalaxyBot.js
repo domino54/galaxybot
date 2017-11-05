@@ -533,6 +533,16 @@ class GalaxyBot {
 				if (args.length == 2 && mxid > 0) {
 					this.log(botGuild, this.compose('Searching for mxid %1 in %2 Exchange...', mxid, exchange));
 
+					this.mx.maps(exchange, [mxid], mapInfo => {
+						// Not found
+						if (!mapInfo || mapInfo.length <= 0) {
+							message.channel.send(this.compose("Sorry <@%1>, I couldn't find map with id **%2**. :cry:", message.member.id, mxid));
+							this.log(botGuild, 'MX map not found: ' + mxid);
+							return;
+						}
+
+						this.showMXInfo(botGuild, exchange, mapInfo[0]);
+					});
 				}
 
 				// Search by map name.
@@ -541,8 +551,16 @@ class GalaxyBot {
 					const mapName = args.join(' ');
 					this.log(botGuild, this.compose('Searching for "%1" in %2 Exchange...', mapName, exchange));
 
-					this.mx.search(exchange, { trackname: mapName }, mapsInfo => {
-						//console.log(mapsInfo);
+					this.mx.search(exchange, { trackname: mapName, limit: 1 }, mapsInfo => {
+						// No results.
+						if (!mapsInfo || !mapsInfo.results || mapsInfo.results.length <= 0) {
+							message.channel.send(this.compose("Sorry <@%1>, I couldn't find any map called **%2**. :cry:", message.member.id, mapName));
+							this.log(botGuild, 'No MX results found: ' + mapName);
+							return;
+						}
+
+						this.log(botGuild, mapsInfo.results.length + ' results found for ' + mapName);
+						this.showMXInfo(botGuild, exchange, mapsInfo.results[0]);
 					});
 				}
 
@@ -816,6 +834,35 @@ class GalaxyBot {
 			}
 		}
 
+		// Detect Mania Exchange map links.
+		else if (message.content.toLowerCase().indexOf('mania-exchange.com') >= 0) {
+			if (!message.member) return;
+
+			var explode = message.content.split('/');
+			var botGuild = this.getBotGuild(message.guild);
+			botGuild.name = message.guild.name;
+			botGuild.lastTextChannel = message.channel;
+			var site = false;
+			var mxid = 0;
+
+			for (var i = 0; i < explode.length; i++) {
+				var part = explode[i];
+				if (part == 'tm.mania-exchange.com') site = 'tm';
+				if (part == 'sm.mania-exchange.com') site = 'sm';
+				var possibleId = parseInt(part);
+				if (isNaN(possibleId) || possibleId <= 0) continue;
+				mxid = possibleId;
+				break;
+			}
+
+			if (site && mxid > 0) {
+				this.log(botGuild, 'MX link detected: '+site+' '+mxid);
+				this.mx.maps(site, [mxid], mapInfo => {
+					if (mapInfo) this.showMXInfo(botGuild, site, mapInfo[0]);
+				});
+			}
+		}
+
 		// Reddit, pretty much.
 		else if (message.content.toLowerCase() == 'good bot') {
 			message.channel.send(this.compose('Thank you, <@%1>! :heart:', message.author.id));
@@ -1079,6 +1126,90 @@ class GalaxyBot {
 			botGuild.lastTextChannel.send(embed);
 			this.log(botGuild, 'Successfully sent current episode: ' + channelId);
 		});
+	}
+
+	/**
+	 * Show information about ManiaExchange map.
+	 *
+	 * @param {Guild} botGuild - Guild to send map info.
+	 * @param {String} exchange - Site from which info was abtained.
+	 * @param {Object} mapInfo - Information about the map.
+	 */
+	showMXInfo(botGuild, exchange, mapInfo) {
+		if (!botGuild || !exchange || !mapInfo) return;
+
+		var mxid = 0;
+		if (mapInfo.TrackID) mxid = mapInfo.TrackID;
+		if (mapInfo.MapID) mxid = mapInfo.MapID;
+		if (mxid <= 0) return;
+
+		// Environment name and map type.
+		var fields = [{
+			name: 'Environment',
+			value: mapInfo.EnvironmentName,
+			inline: true
+		}, {
+			name: 'Map type',
+			value: mapInfo.MapType,
+			inline: true
+		}, {
+			name: 'Display cost',
+			value: mapInfo.DisplayCost + ' C',
+			inline: true
+		}, {
+			name: 'Title pack',
+			value: mapInfo.TitlePack,
+			inline: true
+		}];
+
+		// Vehicle name.
+		if (mapInfo.VehicleName) fields.push({
+			name: 'Vehicle',
+			value: mapInfo.VehicleName,
+			inline: true
+		});
+
+		// Awards.
+		if (mapInfo.AwardCount > 0) fields.push({
+			name: 'Awards',
+			value: mapInfo.AwardCount,
+			inline: true
+		});
+
+		// Track value.
+		if (mapInfo.TrackValue > 0) fields.push({
+			name: 'Track value',
+			value: '+ ' + mapInfo.TrackValue,
+			inline: true
+		});
+
+		// Online rating.
+		if (mapInfo.RatingVoteCount > 0) fields.push({
+			name: 'Online rating',
+			value: parseInt(mapInfo.RatingVoteAverage) + '% (' + mapInfo.RatingVoteCount + ')',
+			inline: true
+		});
+
+		var embed = new Discord.RichEmbed({
+			title: mapInfo.Name,
+			url: 'https://'+exchange+'.mania-exchange.com/tracks/'+mxid,
+			color: 0x7AD5FF,
+			description: mapInfo.Comments,
+			author: {
+				name: mapInfo.Username,
+				url: 'https://'+exchange+'.mania-exchange.com/user/profile/'+mapInfo.UserID
+			},
+			fields: fields,
+			image: { url: 'https://'+exchange+'.mania-exchange.com/tracks/screenshot/normal/'+mxid },
+			footer: {
+				text: 'Mania Exchange',
+				icon_url: 'https://mania-exchange.com/Content/images/planet_mx_logo.png'
+			},
+			timestamp: mapInfo.UpdatedAt
+		});
+
+		botGuild.lastTextChannel.send(embed);
+		this.log(botGuild, 'Successfully sent MX map info: ' + mapInfo.Name);
 	}
 }
 

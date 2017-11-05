@@ -1,4 +1,4 @@
-const http = require('http');
+const https = require('https');
 const querystring = require('querystring');
 
 const hostname = 'api.mania-exchange.com';
@@ -18,11 +18,15 @@ class ManiaExchange {
 	 * @param {Object} query - Request query. 
 	 * @param {Function} callback - Function to call when request is finished.
 	 */ 
-	httpGet(host, path, query, callback) {
-		http.get({
-			hostname: host,
-			path: path + '?' + querystring.stringify(query)
-		}, response => {
+	httpsGet(host, path, query, callback) {
+		https.get({
+			host: host,
+			path: path + '?' + querystring.stringify(query),
+			headers: {
+				'User-Agent': 'Mozilla/5.0'
+			}
+		},
+		response => {
 			var body = '';
 			response.on('data', data => { body += data; });
 			response.on('end', () => { callback(body); });
@@ -39,13 +43,16 @@ class ManiaExchange {
 		var siteHostname;
 		if (site == 'tm') siteHostname = siteTM;
 		if (site == 'sm') siteHostname = siteSM;
+		params.api = 'on';
 
-		var arg = params;
-		arg.api = 'on';
-		arg.format = 'json';
+		this.httpsGet(siteHostname, '/tracksearch2/search', params, body => {
+			var result = JSON.parse(body);
+			callback(result);
+		});
+	}
 
-		this.httpGet(siteHostname, 'tracksearch2/search', arg, body => {
-			console.log(body);
+	maps(site, maps, callback) {
+		this.httpsGet(hostname, '/'+site+'/maps/' + maps.join(','), null, body => {
 			var result = JSON.parse(body);
 			callback(result);
 		});
