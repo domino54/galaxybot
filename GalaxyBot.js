@@ -12,6 +12,7 @@ const fs = require('fs');
 const Track = require('./Track');
 const Guild = require('./Guild');
 const ManiaPlanet = require('./ManiaPlanet');
+const ManiaExchange = require('./ManiaExchange');
 
 /**
  * The GalaxyBot itself.
@@ -33,6 +34,7 @@ class GalaxyBot {
 		process.on('SIGBREAK', () => { this.end(); });
 
 		this.maniaplanet = new ManiaPlanet();
+		this.mx = new ManiaExchange();
 
 		this.activeGuilds = [];
 		this.modRoles = [];
@@ -499,6 +501,51 @@ class GalaxyBot {
 				}
 
 				this.showCurrentEpisode(botGuild, channelId);
+				break;
+			}
+
+			// Mania Exhange
+			case 'mx' : {
+				// Which Exchange?
+				if (args.length <= 0) {
+					message.channel.send(this.compose('<@%1>, please specify which Mania Exchange do you want me to use: `sm` or `tm`. :point_up:', message.member.id));
+					this.log(botGuild, 'No Exchange specified.');
+					return;
+				}
+
+				// Get Exchange.
+				const exchange = args[0].toLowerCase();
+				if (exchange != 'tm' && exchange != 'sm') {
+					message.channel.send(this.compose('<@%1>, we have only `sm` and `tm` Mania Exchange. :shrug:', message.member.id));
+					this.log(botGuild, 'Unknown Exchange.');
+					return;
+				}
+
+				// No more params specified.
+				if (args.length < 2) {
+					message.channel.send(this.compose('<@%1>, would be really nice if you told me the `mxid` or search for a map name. :shrug:', message.member.id));
+					this.log(botGuild, 'No mxid or search query specified.');
+					return;
+				}
+
+				// Get map information by mxid.
+				const mxid = parseInt(args[1]);
+				if (args.length == 2 && mxid > 0) {
+					this.log(botGuild, this.compose('Searching for mxid %1 in %2 Exchange...', mxid, exchange));
+
+				}
+
+				// Search by map name.
+				else {
+					args.shift();
+					const mapName = args.join(' ');
+					this.log(botGuild, this.compose('Searching for "%1" in %2 Exchange...', mapName, exchange));
+
+					this.mx.search(exchange, { trackname: mapName }, mapsInfo => {
+						//console.log(mapsInfo);
+					});
+				}
+
 				break;
 			}
 

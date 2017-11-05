@@ -1,5 +1,5 @@
 const https = require('https');
-const querystring= require('querystring');
+const querystring = require('querystring');
 const hostname = 'v4.live.maniaplanet.com';
 
 // For formatting strip: ManiaPlanet formatting codes.
