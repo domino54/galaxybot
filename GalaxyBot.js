@@ -209,11 +209,13 @@ class GalaxyBot {
 
 		// Play stream or direct URL.
 		try {
+			var streamOptions = { passes: 3, bitrate: 44100 };
+
 			if (botGuild.currentTrack.stream) {
-				botGuild.voiceDispatcher = botGuild.voiceConnection.playStream(botGuild.currentTrack.stream);
+				botGuild.voiceDispatcher = botGuild.voiceConnection.playStream(botGuild.currentTrack.stream, streamOptions);
 			}
 			else if (botGuild.currentTrack.sourceURL) {
-				botGuild.voiceDispatcher = botGuild.voiceConnection.playArbitraryInput(botGuild.currentTrack.sourceURL);
+				botGuild.voiceDispatcher = botGuild.voiceConnection.playArbitraryInput(botGuild.currentTrack.sourceURL, streamOptions);
 			}
 
 			this.log(botGuild, 'Creating new voice dispatcher.');
@@ -569,7 +571,7 @@ class GalaxyBot {
 
 			// Show the user currently played track.
 			case 'now' : {
-				this.nowPaying(botGuild, false);
+				this.nowPlaying(botGuild, false);
 				break;
 			}
 
@@ -667,9 +669,8 @@ class GalaxyBot {
 				this.log(botGuild, 'Stopped playback on admin command.');
 
 				botGuild.tracksQueue = [];
-				if (botGuild.voiceConnection) botGuild.voiceConnection.channel.leave();
+				// if (botGuild.voiceConnection) botGuild.voiceConnection.channel.leave();
 				if (botGuild.voiceDispatcher) botGuild.voiceDispatcher.end();
-
 				break;
 			}
 

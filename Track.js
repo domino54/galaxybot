@@ -50,34 +50,43 @@ class Track {
 	 * @param {Function} callback - Function to call when YouTube info is obtained.
 	 */
 	loadYouTube(callback) {
-		try {
-			this.stream = ytdl(this.url, {filter: 'audioonly'}); ///< TODO: Fix livestreams crashing the whole bot.
-			//this.stream = ytdl(this.url); ///< Rest in peace network connection.
-			this.stream.on("info", (info, format) => {
-				if (!format) {
-					callback(false);
-					return;
-				}
+		ytdl.getInfo(this.url, (error, info) => {
+			if (error) {
+				console.log(error);
+				callback(false);
+				return;
+			}
 
-				this.author = {
-					name: info.author.name,
-					url: info.author.user_url,
-					icon_url: info.author.avatar
-				}
-				this.title = info.title;
-				this.description = info.description;
-				this.thumbnail = 'http://img.youtube.com/vi/'+info.video_id+'/mqdefault.jpg';;
-				this.duration = info.length_seconds;
-				this.color = 0xCC181E;
-				this.isLivestream = info.live_playback;
-				this.embed = this.createEmbed();
+			var filters = null;
+			if (!info.live_playback) filters = {filter: 'audioonly'};
+			
+			// Create stream.
+			try {
+				this.stream = ytdl(this.url, filters);
+				this.stream.on("info", info => {
+					callback(this);
+				});
+			}
+			catch (exception) {
+				console.log(exception);
+				callback(false);
+				return;
+			}
 
-				callback(this);
-			});
-		}
-		catch (error) {
-			callback(false);
-		}
+			// Video information.
+			this.author = {
+				name: info.author.name,
+				url: info.author.user_url,
+				icon_url: info.author.avatar
+			}
+			this.title = info.title;
+			this.description = info.description;
+			this.thumbnail = 'http://img.youtube.com/vi/'+info.video_id+'/mqdefault.jpg';;
+			this.duration = info.length_seconds;
+			this.color = 0xCC181E;
+			this.isLivestream = info.live_playback;
+			this.embed = this.createEmbed();
+		});
 	}
 
 	/**
