@@ -113,6 +113,15 @@ class GalaxyBot {
 		this.client.guilds.forEach((guild, guildId) => {
 			var botGuild = this.getBotGuild(guild);
 		});
+
+		/*
+		this.client.guilds.forEach((guild, guildId) => {
+			guild.members.forEach((member, memberId) => {
+				if (member.user.id != this.client.user.id) return;
+				member.setNickname('');
+			});
+		});
+		*/
 	}
 
 	/**
@@ -180,12 +189,16 @@ class GalaxyBot {
 	hasControlOverBot(member) {
 		if (!member) return false;
 		if (member.id == this.config.dommy || member.hasPermission('ADMINISTRATOR')) return true; ///< I'm the god of this module.
-		
+
+		var botGuild = this.getBotGuild(member.guild);
+		var modRoles = this.getSetting(botGuild, 'roles').split(',');
+		var matchingRoles = 0;
+
 		member.roles.forEach((role, roleId) => {
-			if (this.modRoles[role.name]) return true;
+			if (modRoles.indexOf(role.name) != -1) matchingRoles++;
 		});
 
-		return false;
+		return matchingRoles > 0;
 	}
 
 	/**
@@ -311,12 +324,13 @@ class GalaxyBot {
 		}
 
 		// Track is too long and user has no permission to surpass the limit.
-		if (!this.hasControlOverBot(member) && track.duration > this.config.maxlength) {
+		const maxDuration = this.getSetting(botGuild, 'max-duration');
+		if (!hasPermissions && maxDuration > 0 && track.duration > maxDuration) {
 			botGuild.lastTextChannel.send(this.compose(
 				'Sorry <@%1>, **%2** is too long! (%3/%4) :rolling_eyes:',
-				member.id, track.title, track.timeToText(track.duration), track.timeToText(this.config.maxlength)
+				member.id, track.title, track.timeToText(track.duration), track.timeToText(maxDuration)
 			));
-			this.log(botGuild, this.compose('Track %1 not added: too long (%2/%3).', url, track.duration, this.config.maxlength));
+			this.log(botGuild, this.compose('Track %1 not added: too long (%2/%3).', url, track.duration, maxDuration));
 			return;
 		}
 
@@ -330,8 +344,8 @@ class GalaxyBot {
 		this.log(botGuild, 'Track successfully added: ' + track.title);
 
 		// Queue new track.
-		var isNext = (param === 'now' || param === 'next') && botGuild.tracksQueue.length > 0;
-		var isNow = param === 'now' && hasPermissions;
+		const isNext = (param === 'now' || param === 'next') && botGuild.tracksQueue.length > 0;
+		const isNow = param === 'now' && hasPermissions;
 
 		if (isNext && hasPermissions) {
 			if (isNow) botGuild.lastTextChannel.send(this.compose("Okay <@%1>, let's play it right now! :smirk:", member.id));
@@ -370,36 +384,31 @@ class GalaxyBot {
 	/**
 	 * Basic commands handling.
 	 *
+	 * @param {Guild} botGuild - The guild command was sent in.
 	 * @param {Message} message - The message command was sent in.
 	 * @param {String} name - Name of the command used.
 	 * @param {Array} args - Arguments provided with the command.
 	 */
-	onCommand(message, name, args) {
+	onCommand(botGuild, message, name, args) {
 		if (!message) return;
 
-		// Log command.
-		this.log(botGuild, this.compose('Command sent by %1: %2', message.author.username, name));
-
-		// Register new server if not registered yet.
-		var botGuild = this.getBotGuild(message.guild);
-		if (botGuild) {
-			botGuild.name = message.guild.name;
-			botGuild.lastTextChannel = message.channel;
-		}
-
 		// Server-only command in DM.
-		else {
-			const guildCommands = ['dommy', 'play', 'undo', 'now', 'next', 'queue', 'skip', 'stop'];
+		if (!botGuild) {
+			const guildCommands = ['dommy', 'play', 'undo', 'now', 'next', 'queue', 'skip', 'stop', 'setting'];
 			if (guildCommands.indexOf(name) != -1) {
 				message.channel.send('Sorry, this command works only on servers!');
 				return;
 			}
 		}
 		
+		// Log command.
+		this.log(botGuild, this.compose('Command sent by %1: %2', message.author.username, name));
+
 		switch (name) {
 			// Show available commands list.
 			case 'help' : {
-				message.channel.send(this.compose(this.helpPage, message.author.id, this.config.prefix));
+				var commandPrefix = this.getSetting(botGuild, 'prefix');
+				message.channel.send(this.compose(this.helpPage, message.author.id, commandPrefix));
 				break;
 			}
 
@@ -709,7 +718,8 @@ class GalaxyBot {
 			// Stop everything.
 			case 'stop' : {
 				if (!this.hasControlOverBot(message.member)) {
-					message.channel.send(this.compose('Only server administrators and people with at least one of following roles can stop me: %1. :point_up:', this.modRoles.join(', ')));
+					var modRoles = this.getSetting(botGuild, 'roles').split(',');
+					message.channel.send(this.compose('Only server administrators and people with at least one of following roles can stop me: %1. :point_up:', modRoles.join(', ')));
 					return;
 				}
 
@@ -824,82 +834,22 @@ class GalaxyBot {
 				break;
 			}
 
-			case 'set' : {
-				
-
-				const possibleSet = {
-					'prefix': 'Character used to indicate commands.',
-					'embed-mx': 'Detect and send Mania Exchange links.',
-					'embed-titles': 'Detect and send ManiaPlanet titles links.',
-					'embed-maps': 'Detect and send ManiaPlanet maps links.',
-					'roles': 'Roles with permissions to manage GalaxyBot, separated by a comma.'
-				};
-
-				if (args.length <= 0) {
-					message.channel.send(this.compose('To change a setting, specify `name` and `value` in this command. Available settings are: %1.', Object.keys(possibleSet).join(', ')));
-					this.log(botGuild, 'Invalid command params: no setting name specified.');
+			// Change bot settings in guild.
+			case 'setting' : {
+				// No permissions to tweak settings
+				if (!this.hasControlOverBot(message.member)) {
+					message.channel.send(this.compose("Sorry <@%1>, you don't have permissions to modify my settings. :no_entry_sign:", message.member.id));
+					this.log(botGuild, 'No permissions to change guild settings: ' + message.member.displayName);
 					return;
 				}
 
+				// Command params.
 				const settingName = args[0];
-
-				// Unknown setting.
-				if (!possibleSet[settingName]) {
-					message.channel.send(this.compose('Unknown setting: **%1**. Send empty `settings` command to see available settings.', settingName));
-					this.log(botGuild, 'Unknown setting: ' + settingName);
-					return;
-				}
-
-				// Show setting description and name.
-				if (args.length == 1) {
-					this.log('Showing description of setting: ' + settingName);
-					const isDefined = botGuild.settings[settingName];
-
-					message.channel.send(new Discord.RichEmbed({
-						title: settingName,
-						fields: [{
-							name: 'Description',
-							value: possibleSet[settingName]
-						}, {
-							name: 'Current value',
-							value: (isDefined ? botGuild.settings[settingName] : 'Undefined')
-						}]
-					}));
-					return;
-				}
-
-				// Setting value.
 				args.shift();
-				const settingValue = args.join(' ');
+				const settingValue = (args[0] ? args.join(' ') : false);
 
-				// Initialize settings.
-				if (!botGuild.settings) botGuild.settings = new Object();
-
-				switch (settingName) {
-					case 'prefix' : {
-						if (settingValue.length != 1) {
-							message.channel.send('Prefix can be only 1 character long!');
-							return;
-						}
-						
-						if (settingValue == ' ') {
-							message.channel.send("Prefix can't be set to white space.");
-							return;
-						}
-
-						if (settingValue == this.config.prefix) {
-							message.channel.send('Prefix set to default value');
-							botGuild.settings[settingName] = false;
-							return;
-						}
-
-						message.channel.send(this.compose('Prefix set to **%1**.', settingValue));
-						botGuild.settings[settingName] = settingValue;
-					}
-				}
-
-				botGuild.saveSettings();
-				this.log(botGuild, 'Updated settings of guild: ' + botGuild.name);
+				// Edit setting.
+				this.editSetting(message, settingName, settingValue);
 				break;
 			}
 		}
@@ -913,32 +863,35 @@ class GalaxyBot {
 	onMessage(message) {
 		if (message.author.id == this.client.user.id) return;
 
-		var isCommand = message.content.startsWith(this.config.prefix);
+		// Get message bot guild.
+		var botGuild = this.getBotGuild(message.guild);
+		if (botGuild) {
+			botGuild.name = message.guild.name;
+			botGuild.lastTextChannel = message.channel;
+		}
+
+		var commandPrefix = this.getSetting(botGuild, 'prefix');
+		var isCommand = message.content.startsWith(commandPrefix);
 		
 		// Send command to commands handler.
 		if (isCommand) {
 			var cmdArgs = message.content.split(' ');
-			var cmdName = cmdArgs[0].replace(this.config.prefix, '').toLowerCase();
+			var cmdName = cmdArgs[0].replace(commandPrefix, '').toLowerCase();
 			cmdArgs.shift();
-			this.onCommand(message, cmdName, cmdArgs);
+			this.onCommand(botGuild, message, cmdName, cmdArgs);
 		}
 
 		// If bot is mentioned, send information about help command.
 		if (message.author != this.client.user && message.content.indexOf(this.client.user.id) >= 0) {
-			message.channel.send(this.compose('<@%1>, need help with anything? Type **%2help** to see my commands! :raised_hands:', message.author.id, this.config.prefix));
+			message.channel.send(this.compose('<@%1>, need help with anything? Type **%2help** to see my commands! :raised_hands:', message.author.id, commandPrefix));
 		}
 
 		// Check if message contains something about ManiaPlanet.
 		if (message.content.toLowerCase().indexOf('maniaplanet') >= 0) {
 			var explode = message.content.split('/');
-			var botGuild = this.getBotGuild(message.guild);
-			if (botGuild) {
-				botGuild.name = message.guild.name;
-				botGuild.lastTextChannel = message.channel;
-			}
-
+			
 			// Link to a title page.
-			if (message.content.match(/maniaplanet\.com\/titles\/\w+@\w+/)) {
+			if (message.content.match(/maniaplanet\.com\/titles\/\w+@\w+/) && this.getSetting(botGuild, 'embed-titles')) {
 				var titleUid = '';
 
 				for (var i = explode.length - 1; i >= 0; i--) {
@@ -952,7 +905,7 @@ class GalaxyBot {
 			}
 
 			// Link to a map page.
-			else if (message.content.match(/maniaplanet\.com\/maps\/[A-Za-z0-9]+/)) {
+			else if (message.content.match(/maniaplanet\.com\/maps\/[A-Za-z0-9]+/) && this.getSetting(botGuild, 'embed-maps')) {
 				var mapUid = '';
 				var prevWasMaps = false;
 
@@ -968,14 +921,8 @@ class GalaxyBot {
 
 		// Detect Mania Exchange map links.
 		var matchMX = message.content.match(/(tm|sm)\.mania-exchange\.com\/(tracks|maps|s\/tr)\/(view\/)?[0-9]+/);
-		if (matchMX) {
-			var explode = matchMX[0].split('/');
-			var botGuild = this.getBotGuild(message.guild);
-			if (botGuild) {
-				botGuild.name = message.guild.name;
-				botGuild.lastTextChannel = message.channel;
-			}
-
+		if (matchMX && this.getSetting(botGuild, 'embed-mx')) {
+			var explode = message.content.split('/');
 			var site = false;
 			var mxid = 0;
 
@@ -1359,6 +1306,197 @@ class GalaxyBot {
 
 		message.channel.send(embed);
 		this.log(botGuild, 'Successfully sent MX map info: ' + mapInfo.Name);
+	}
+
+	/**
+	 * Get the guild setting.
+	 *
+	 * @param {Guild} botGuild - The guild to get setting from. Global settings used if undefined.
+	 * @param {String} settingName - Name of the setting to get.
+	 * @returns {mixed} Value of the setting in guild. `undefined` if not found.
+	 */
+	getSetting(botGuild, settingName) {
+		if (!settingName) return undefined;
+
+		if (botGuild && botGuild.settings[settingName]) return botGuild.settings[settingName];
+		if (this.config.settings[settingName]) return this.config.settings[settingName];
+		return undefined;
+	}
+
+	/**
+	 * Edit the guild setting.
+	 *
+	 * @param {Message} message - Message in which command was sent.
+	 * @param {String} settingName - Name of the setting to change.
+	 * @param {String} settingValue - Value to set.
+	 */
+	editSetting(message, settingName, settingValue) {
+		if (!message) return;
+
+		// Get guild.
+		var botGuild = this.getBotGuild(message.guild);
+		if (!botGuild) return;
+
+		// Available settings list.
+		const possibleSet = {
+			'prefix': 'Character used to indicate commands.',
+			'embed-mx': 'Detect and send Mania Exchange links.',
+			'embed-titles': 'Detect and send ManiaPlanet titles links.',
+			'embed-maps': 'Detect and send ManiaPlanet maps links.',
+			'roles': 'Roles with permissions to manage GalaxyBot.',
+			'max-duration': 'Maximum duration (in seconds) of music tracks users without full permissions can play. 0 = no limit.'
+		};
+
+		// Setting not specified.
+		if (!settingName) {
+			message.channel.send(this.compose('To change a setting, specify `name` and `value` in this command. Available settings are: %1.', Object.keys(possibleSet).join(', ')));
+			this.log(botGuild, 'Invalid command params: no setting name specified.');
+			return;
+		}
+
+		// Unknown setting.
+		if (!possibleSet[settingName]) {
+			message.channel.send(this.compose('Unknown setting: **%1**. Send empty `settings` command to see available settings.', settingName));
+			this.log(botGuild, 'Unknown setting: ' + settingName);
+			return;
+		}
+
+		// Initialize settings, if not sreated yet.
+		if (!botGuild.settings) botGuild.settings = new Object();
+
+		// Change value of a setting.
+		if (settingValue) {
+			switch (settingName) {
+				// Commands prefix.
+				case 'prefix' : {
+					// Prefix must be 1 character long and shouldn't be a white space.
+					if (settingValue.length != 1 || settingValue == ' ') {
+						message.channel.send('Prefix can be only 1 character long and must be other character than white space.');
+						return;
+					}
+					
+					if (settingValue == this.config.settings.prefix) {
+						delete botGuild.settings.prefix;
+					} else {
+						botGuild.settings.prefix = settingValue;
+					}
+					break;
+				}
+
+				// Mania Exchange and ManiaPlanet links embedding.
+				case 'embed-mx' :
+				case 'embed-titles' :
+				case 'embed-maps' : {
+					settingValue = settingValue.toLowerCase();
+
+					// Setting must be boolean.
+					if (settingValue != 'false' && settingValue != 'true') {
+						message.channel.send('This setting has to be a boolean.');
+						return;
+					}
+
+					var settingBoolean = settingValue == 'true';
+
+					if (settingBoolean == this.config.settings.prefix) {
+						delete botGuild.settings[settingName];
+					} else {
+						botGuild.settings[settingName] = settingBoolean;
+					}
+					break;
+				}
+
+				// Bot administrator roles.
+				case 'roles' : {
+					var explode = settingValue.split(' ');
+					var action = explode.shift();
+					var roleName = explode.join(' ');
+
+					var currentRoles = this.config.settings.roles.split(',');
+					if (botGuild.settings.roles) currentRoles = botGuild.settings.roles.split(',');
+
+					// Add new role.
+					if (action == 'add') {
+						// Role already exists.
+						if (currentRoles.indexOf(roleName) != -1) {
+							message.channel.send("This role already exists.");
+							return;
+						}
+						else {
+							currentRoles.push(roleName);
+							botGuild.settings.roles = currentRoles.join(',');
+						}
+					}
+
+					// Remove a role.
+					else if (action == 'remove') {
+						// Role doesn't exist.
+						if (currentRoles.indexOf(roleName) == -1) {
+							message.channel.send("This role doesn't exists.");
+							return;
+						}
+						else {
+							currentRoles.splice(currentRoles.indexOf(roleName), 1);
+							botGuild.settings.roles = currentRoles.join(',');
+						}
+					}
+
+					// Incorrect action.
+					else {
+						message.channel.send('Specify a valid action to perform: `add` or `remove`.');
+						return;
+					}
+
+					// Remove value if set to default.
+					if (botGuild.settings.roles == this.config.settings.roles) {
+						delete botGuild.settings.roles;
+					}
+
+					break;
+				}
+
+				// Maximum music track duration.
+				case 'max-duration' : {
+					var settingInteger = parseInt(settingValue);
+
+					// Invalid number.
+					if (settingInteger < 0) {
+						message.channel.send('Enter a number greater or equal to 0.');
+						return;
+					}
+
+					if (settingInteger == this.config.settings[settingName]) {
+						delete botGuild.settings[settingName];
+					} else {
+						botGuild.settings[settingName] = settingInteger;
+					}
+					break;
+				}
+			}
+
+			botGuild.saveSettings();
+			this.log(botGuild, 'Updated settings of guild: ' + botGuild.name);
+		}
+
+		// Show setting description, value and default.
+		const isDefined = botGuild.settings[settingName];
+		const defaultValue = this.config.settings[settingName];
+
+		message.channel.send(new Discord.RichEmbed({
+			fields: [{
+				name: settingName,
+				value: possibleSet[settingName]
+			}, {
+				name: 'Current value',
+				value: (isDefined ? botGuild.settings[settingName] : defaultValue),
+				inline: true
+			}, {
+				name: 'Default value',
+				value: defaultValue,
+				inline: true
+			}]
+		}));
+
+		this.log(botGuild, 'Showing setting values: ' + settingName);
 	}
 }
 

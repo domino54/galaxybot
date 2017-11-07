@@ -1,6 +1,4 @@
-prefix:     '!'
-maxlength:  600
-dommy:      99612832353505280
+dommy:    99612832353505280
 
 discord:
   token:  your_token_here
@@ -12,5 +10,10 @@ facebook:
   appid:  your_application_id
   secret: your_application_secret
 
-roles:
-  - name: GalaxyBot
+settings:
+  prefix:         '!'
+  embed-mx:       true
+  embed-titles:   true
+  embed-maps:     true
+  roles:          GalaxyBot
+  max-duration:   600

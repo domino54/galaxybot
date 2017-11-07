@@ -26,6 +26,9 @@ class Guild {
 		this.readSettings();
 	}
 
+	/**
+	 * Reloads guild settings from the disk.
+	 */
 	readSettings() {
 		fs.readFile(this.settingsPath, 'utf8', (error, data) => {
 			if (error) {
@@ -43,6 +46,9 @@ class Guild {
 		});
 	}
 
+	/**
+	 * Saves guild settings on disk.
+	 */
 	saveSettings() {
 		if (!this.settings) {
 			console.log('Could not save guild settings: ' + this.settingsPath);

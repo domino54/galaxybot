@@ -11,6 +11,7 @@ All available commands of the GalaxyBot. `!command <mandatory> [optional]`
 * `!invite` - Sends link allowing users to add the bot to their server.
 * `!guilds` - Lists all servers the bot is currently in.
 * `!avatar [name]` - Sends you direct link to your or someone's avatar.
+* `!setting [name] <value>` - Manage bot settings in the server. See settings list below for more information.
 
 ### Music player
 Supported platforms are: YouTube, Facebook, Streamable.
@@ -33,6 +34,16 @@ Bot automatically reacts to ManiaPlanet titles and maps links, as well as Mania 
 * `!mx <tm|sm> <id|query>` - Search for Mania Exchange map by ID or map name.
 
 Instead of using title `id` in commands you can use cone of following short codes: canyon, storm, stadium, valley, lagoon, galaxy, pursuit, pursuit-s, royal, siege, battle, elite, combo, joust, warlords, heroes, tm2, competition, rpg, obstacle, stormuim, infection, speedball, alpine.
+
+## Settings
+Available bot settings, which server administrators can tweak to customize bot behavior.
+
+* `prefix` - Character used to indicate commands.
+* `embed-mx` - Detect and send Mania Exchange links.
+* `embed-titles` - Detect and send ManiaPlanet titles links.
+* `embed-maps` - Detect and send ManiaPlanet maps links.
+* `roles` - Manage roles with permissions to manage GalaxyBot.
+* `max-duration` - Maximum duration (in seconds) of music tracks users without full permissions can play. `0` = no limit.
 
 ## Screenshots
 
