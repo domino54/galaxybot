@@ -850,7 +850,7 @@ class GalaxyBot {
 		}
 
 		// Check if message contains something about ManiaPlanet.
-		else if (message.content.toLowerCase().indexOf('maniaplanet') >= 0) {
+		if (message.content.toLowerCase().indexOf('maniaplanet') >= 0) {
 			var explode = message.content.split('/');
 			var botGuild = this.getBotGuild(message.guild);
 			if (botGuild) {
@@ -888,9 +888,9 @@ class GalaxyBot {
 		}
 
 		// Detect Mania Exchange map links.
-		else if (message.content.toLowerCase().indexOf('mania-exchange.com') >= 0) {
-			
-			var explode = message.content.split('/');
+		var matchMX = message.content.match(/(tm|sm)\.mania-exchange\.com\/(tracks|maps|s\/tr)\/(view\/)?[0-9]+/);
+		if (matchMX) {
+			var explode = matchMX[0].split('/');
 			var botGuild = this.getBotGuild(message.guild);
 			if (botGuild) {
 				botGuild.name = message.guild.name;
@@ -913,7 +913,7 @@ class GalaxyBot {
 			if (site && mxid > 0) {
 				this.log(botGuild, 'MX link detected: '+site+' '+mxid);
 				this.mx.maps(site, [mxid], mapInfo => {
-					if (mapInfo) this.showMXInfo(botGuild, site, mapInfo[0]);
+					if (mapInfo) this.showMXInfo(message, site, mapInfo[0]);
 				});
 			}
 		}
@@ -1223,11 +1223,14 @@ class GalaxyBot {
 			name: 'Display cost',
 			value: mapInfo.DisplayCost + ' C',
 			inline: true
-		}, {
+		}];
+		
+		// Title pack.
+		if (mapInfo.TitlePack) fields.push ({
 			name: 'Title pack',
 			value: mapInfo.TitlePack,
 			inline: true
-		}];
+		});
 
 		// Vehicle name.
 		if (mapInfo.VehicleName) fields.push({
@@ -1261,7 +1264,7 @@ class GalaxyBot {
 			title: mapInfo.Name,
 			url: 'https://'+exchange+'.mania-exchange.com/tracks/'+mxid,
 			color: 0x7AD5FF,
-			description: mapInfo.Comments,
+			description: mapInfo.Comments.substring(0, 2048),
 			author: {
 				name: mapInfo.Username,
 				url: 'https://'+exchange+'.mania-exchange.com/user/profile/'+mapInfo.UserID
