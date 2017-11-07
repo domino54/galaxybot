@@ -37,7 +37,6 @@ class GalaxyBot {
 		this.mx = new ManiaExchange();
 
 		this.activeGuilds = [];
-		this.modRoles = [];
 	}
 
 	/**
@@ -82,9 +81,6 @@ class GalaxyBot {
 		
 		// Log in to Discord.
 		else this.client.login(this.config.discord.token);
-
-		// Get the bot roles
-		if (this.config.roles) for (const role of this.config.roles) this.modRoles.push(role.name);
 
 		// Connect to Facebook
 		if (this.config.facebook && this.config.facebook.appid && this.config.facebook.secret) {
@@ -284,6 +280,14 @@ class GalaxyBot {
 				if (botGuild.currentTrack.isLivestream) header = this.compose("I'm tuned up for the livestream, <@%1>! :red_circle:", botGuild.currentTrack.sender.id);
 				else header = this.compose("I'm playing your track now, <@%1>! :metal:", botGuild.currentTrack.sender.id);
 			}
+
+			// Current play point.
+			if (!botGuild.currentTrack.isLivestream) {
+				const current = botGuild.currentTrack.timeToText(parseInt(botGuild.voiceDispatcher.time / 1000));
+				const total = botGuild.currentTrack.timeToText(botGuild.currentTrack.duration);
+				botGuild.currentTrack.embed.description = current+' / '+total;
+			}
+
 			botGuild.lastTextChannel.send(header, botGuild.currentTrack.embed);
 		}
 	}
@@ -394,7 +398,7 @@ class GalaxyBot {
 
 		// Server-only command in DM.
 		if (!botGuild) {
-			const guildCommands = ['dommy', 'play', 'undo', 'now', 'next', 'queue', 'skip', 'stop', 'setting'];
+			const guildCommands = ['dommy', 'play', 'undo', 'now', 'next', 'queue', 'skip', 'stop', 'pause', 'setting'];
 			if (guildCommands.indexOf(name) != -1) {
 				message.channel.send('Sorry, this command works only on servers!');
 				return;
@@ -819,6 +823,39 @@ class GalaxyBot {
 							});
 						}
 					});
+				}
+
+				break;
+			}
+
+			// Pause music playback.
+			case 'pause' : {
+				// No permissions.
+				if (!this.hasControlOverBot(message.member)) {
+					message.channel.send("You con't have permissions to pause/resume music playback. :point_up:");
+					this.log(botGuild, 'No permissions to pause/resume music playback.');
+					return;
+				}
+
+				// Nothing is being played.
+				if (!botGuild.voiceDispatcher) {
+					message.channel.send("Looks like I'm not playing anything right now. :shrug:");
+					this.log(botGuild, 'Nothing is being played.');
+					return;
+				}
+
+				// Resume
+				if (botGuild.voiceDispatcher.paused) {
+					message.channel.send("Aaaand... back to the business. :arrow_forward:");
+					this.log(botGuild, 'Music playback resumed.');
+					botGuild.voiceDispatcher.resume();
+				}
+
+				// Pause
+				else {
+					message.channel.send("We're taking a little break! :pause_button:");
+					this.log(botGuild, 'Music playback paused.');
+					botGuild.voiceDispatcher.pause();
 				}
 
 				break;
