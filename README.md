@@ -10,6 +10,7 @@ All available commands of the GalaxyBot. `!command <mandatory> [optional]`
 * `!git` - Paste link to this repository.
 * `!invite` - Sends link allowing users to add the bot to their server.
 * `!guilds` - Lists all servers the bot is currently in.
+* `!avatar [name]` - Sends you direct link to your or someone's avatar.
 
 ### Music player
 Supported platforms are: YouTube, Facebook, Streamable.

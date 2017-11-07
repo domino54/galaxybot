@@ -108,6 +108,11 @@ class GalaxyBot {
 	onReady() {
 		this.log(false, 'GalaxyBot is ready!');
 		this.client.user.setGame('with Dommy');
+
+		// Register already existing guilds.
+		this.client.guilds.forEach((guild, guildId) => {
+			var botGuild = this.getBotGuild(guild);
+		});
 	}
 
 	/**
@@ -153,6 +158,7 @@ class GalaxyBot {
 	 * @returns {Guild} Bot guild object (no matter how stupid it sounds).
 	 */
 	getBotGuild(guild) {
+		if (!guild) return false;
 		for (const botGuild of this.activeGuilds) {
 			if (guild.id == botGuild.id) return botGuild;
 		}
@@ -371,24 +377,29 @@ class GalaxyBot {
 	onCommand(message, name, args) {
 		if (!message) return;
 
-		// We must be in a server.
-		if (!message.member) {
-			message.channel.send('Sorry, my commands work only on servers!');
-			return;
-		}
+		// Log command.
+		this.log(botGuild, this.compose('Command sent by %1: %2', message.author.username, name));
 
 		// Register new server if not registered yet.
 		var botGuild = this.getBotGuild(message.guild);
-		botGuild.name = message.guild.name;
-		botGuild.lastTextChannel = message.channel;
+		if (botGuild) {
+			botGuild.name = message.guild.name;
+			botGuild.lastTextChannel = message.channel;
+		}
 
-		// Log command.
-		this.log(botGuild, this.compose('Command sent by %1: %2', message.member.displayName, name));
+		// Server-only command in DM.
+		else {
+			const guildCommands = ['dommy', 'play', 'undo', 'now', 'next', 'queue', 'skip', 'stop'];
+			if (guildCommands.indexOf(name) != -1) {
+				message.channel.send('Sorry, this command works only on servers!');
+				return;
+			}
+		}
 		
 		switch (name) {
 			// Show available commands list.
 			case 'help' : {
-				message.channel.send(this.compose(this.helpPage, message.member.id, this.config.prefix));
+				message.channel.send(this.compose(this.helpPage, message.author.id, this.config.prefix));
 				break;
 			}
 
@@ -419,13 +430,52 @@ class GalaxyBot {
 				break;
 			}
 
+			// Show user avatar.
+			case 'avatar' : {
+				var targetUser = message.author;
+
+				if (args.length >= 1 && message.guild) {
+					var matchingUsers = [];
+					var name = args[0].toLowerCase();
+
+					// Find member of matching tag.
+					message.guild.members.forEach((member, memberId) => {
+						if (member.user.tag.toLowerCase().indexOf(name) == -1) return;
+						matchingUsers.push(member.user);
+					});
+
+					// Found someone.
+					if (matchingUsers.length > 0) targetUser = matchingUsers[0];
+					
+					// No users found.
+					else {
+						message.channel.send(this.compose("Sorry <@%1>, I couldn't find user named **%2**. :rolling_eyes:", message.author.id, name));
+						this.log(botGuild, 'Could not find user ' + name);
+						return;
+					}
+				}
+
+				// Send avatar.
+				message.channel.send(new Discord.RichEmbed({
+					author: {
+						name: targetUser.username,
+						icon_url: targetUser.avatarURL
+					},
+					image: {
+						url: targetUser.avatarURL
+					}
+				}));
+				this.log(botGuild, 'Sent avatar URL of ' + targetUser.username);
+				break;
+			}
+
 			// Send servers list of a specific title.
 			case 'servers' : {
 				// Title id not specified.
 				if (args.length <= 0) {
 					message.channel.send(this.compose(
 						'<@%1>, you need to specify `titleUid` in this command. Type `titleUid` after command or use one of these short codes: %2.',
-						message.member.id, this.maniaplanet.getTitleCodes().join(', ')
+						message.author.id, this.maniaplanet.getTitleCodes().join(', ')
 					));
 					this.log(botGuild, 'No UID specified.');
 					return;
@@ -436,7 +486,7 @@ class GalaxyBot {
 				titleUid = this.maniaplanet.getTitleUid(titleUid);
 				
 				this.maniaplanet.servers({'titleUids[]': titleUid, length: 11}, result => {
-					this.serversList(botGuild, result, titleUid);
+					this.serversList(message, result, titleUid);
 				});
 				this.log(botGuild, 'Checking servers of ' + titleUid);
 				break;
@@ -448,7 +498,7 @@ class GalaxyBot {
 				if (args.length <= 0) {
 					message.channel.send(this.compose(
 						'<@%1>, you need to specify `titleUid` in this command. Type `titleUid` after command or use one of these short codes: %2.',
-						message.member.id, this.maniaplanet.getTitleCodes().join(', ')
+						message.author.id, this.maniaplanet.getTitleCodes().join(', ')
 					));
 					this.log(botGuild, 'No UID specified.');
 					return;
@@ -457,7 +507,7 @@ class GalaxyBot {
 				// Get title id.
 				var titleUid = args[0];
 				titleUid = this.maniaplanet.getTitleUid(titleUid);
-				this.showTitleInfo(botGuild, titleUid);
+				this.showTitleInfo(message, titleUid);
 				break;
 			}
 
@@ -465,12 +515,12 @@ class GalaxyBot {
 			case 'map' : {
 				// Map UID not specified.
 				if (args.length <= 0) {
-					message.channel.send(this.compose('<@%1>, you need to specify the map `UID` in this command.', message.member.id));
+					message.channel.send(this.compose('<@%1>, you need to specify the map `UID` in this command.', message.author.id));
 					this.log(botGuild, 'No UID specified.');
 					return;
 				}
 
-				this.showMapInfo(botGuild, args[0]);
+				this.showMapInfo(message, args[0]);
 				break;
 			}
 
@@ -478,7 +528,7 @@ class GalaxyBot {
 			case 'channel' : {
 				// Which channel?
 				if (args.length <= 0) {
-					message.channel.send(this.compose('<@%1>, I need to know if you mean `sm` or `tm` channel. :thinking:', message.member.id));
+					message.channel.send(this.compose('<@%1>, I need to know if you mean `sm` or `tm` channel. :thinking:', message.author.id));
 					this.log(botGuild, 'No channel specified.');
 					return;
 				}
@@ -496,13 +546,13 @@ class GalaxyBot {
 					}
 					// Unknown.
 					default : {
-						message.channel.send(this.compose('<@%1>, currently there are only two channels: `sm` and `tm`. :shrug:', message.member.id));
+						message.channel.send(this.compose('<@%1>, currently there are only two channels: `sm` and `tm`. :shrug:', message.author.id));
 						this.log(botGuild, 'Unknown channel.');
 						return;
 					}
 				}
 
-				this.showCurrentEpisode(botGuild, channelId);
+				this.showCurrentEpisode(message, channelId);
 				break;
 			}
 
@@ -510,7 +560,7 @@ class GalaxyBot {
 			case 'mx' : {
 				// Which Exchange?
 				if (args.length <= 0) {
-					message.channel.send(this.compose('<@%1>, please specify which Mania Exchange do you want me to use: `sm` or `tm`. :point_up:', message.member.id));
+					message.channel.send(this.compose('<@%1>, please specify which Mania Exchange do you want me to use: `sm` or `tm`. :point_up:', message.author.id));
 					this.log(botGuild, 'No Exchange specified.');
 					return;
 				}
@@ -518,14 +568,14 @@ class GalaxyBot {
 				// Get Exchange.
 				const exchange = args[0].toLowerCase();
 				if (exchange != 'tm' && exchange != 'sm') {
-					message.channel.send(this.compose('<@%1>, we have only `sm` and `tm` Mania Exchange. :shrug:', message.member.id));
+					message.channel.send(this.compose('<@%1>, we have only `sm` and `tm` Mania Exchange. :shrug:', message.author.id));
 					this.log(botGuild, 'Unknown Exchange.');
 					return;
 				}
 
 				// No more params specified.
 				if (args.length < 2) {
-					message.channel.send(this.compose('<@%1>, would be really nice if you told me the `mxid` or search for a map name. :shrug:', message.member.id));
+					message.channel.send(this.compose('<@%1>, would be really nice if you told me the `mxid` or search for a map name. :shrug:', message.author.id));
 					this.log(botGuild, 'No mxid or search query specified.');
 					return;
 				}
@@ -538,12 +588,12 @@ class GalaxyBot {
 					this.mx.maps(exchange, [mxid], mapInfo => {
 						// Not found
 						if (!mapInfo || mapInfo.length <= 0) {
-							message.channel.send(this.compose("Sorry <@%1>, I couldn't find map with id **%2**. :cry:", message.member.id, mxid));
+							message.channel.send(this.compose("Sorry <@%1>, I couldn't find map with id **%2**. :cry:", message.author.id, mxid));
 							this.log(botGuild, 'MX map not found: ' + mxid);
 							return;
 						}
 
-						this.showMXInfo(botGuild, exchange, mapInfo[0]);
+						this.showMXInfo(message, exchange, mapInfo[0]);
 					});
 				}
 
@@ -556,13 +606,13 @@ class GalaxyBot {
 					this.mx.search(exchange, { trackname: mapName, limit: 1 }, mapsInfo => {
 						// No results.
 						if (!mapsInfo || !mapsInfo.results || mapsInfo.results.length <= 0) {
-							message.channel.send(this.compose("Sorry <@%1>, I couldn't find any map called **%2**. :cry:", message.member.id, mapName));
+							message.channel.send(this.compose("Sorry <@%1>, I couldn't find any map called **%2**. :cry:", message.author.id, mapName));
 							this.log(botGuild, 'No MX results found: ' + mapName);
 							return;
 						}
 
 						this.log(botGuild, mapsInfo.results.length + ' results found for ' + mapName);
-						this.showMXInfo(botGuild, exchange, mapsInfo.results[0]);
+						this.showMXInfo(message, exchange, mapsInfo.results[0]);
 					});
 				}
 
@@ -782,12 +832,14 @@ class GalaxyBot {
 	 * @param {Message} message - The message to handle.
 	 */
 	onMessage(message) {
+		if (message.author.id == this.client.user.id) return;
+
 		var isCommand = message.content.startsWith(this.config.prefix);
 		
 		// Send command to commands handler.
 		if (isCommand) {
 			var cmdArgs = message.content.split(' ');
-			var cmdName = cmdArgs[0].replace(this.config.prefix, '');
+			var cmdName = cmdArgs[0].replace(this.config.prefix, '').toLowerCase();
 			cmdArgs.shift();
 			this.onCommand(message, cmdName, cmdArgs);
 		}
@@ -799,12 +851,12 @@ class GalaxyBot {
 
 		// Check if message contains something about ManiaPlanet.
 		else if (message.content.toLowerCase().indexOf('maniaplanet') >= 0) {
-			if (!message.member) return;
-
 			var explode = message.content.split('/');
 			var botGuild = this.getBotGuild(message.guild);
-			botGuild.name = message.guild.name;
-			botGuild.lastTextChannel = message.channel;
+			if (botGuild) {
+				botGuild.name = message.guild.name;
+				botGuild.lastTextChannel = message.channel;
+			}
 
 			// Link to a title page.
 			if (message.content.match(/maniaplanet\.com\/titles\/\w+@\w+/)) {
@@ -817,7 +869,7 @@ class GalaxyBot {
 					break;
 				}
 
-				if (titleUid) this.showTitleInfo(botGuild, titleUid);
+				if (titleUid) this.showTitleInfo(message, titleUid);
 			}
 
 			// Link to a map page.
@@ -831,18 +883,20 @@ class GalaxyBot {
 					prevWasMaps = part == 'maps';
 				}
 
-				if (mapUid) this.showMapInfo(botGuild, mapUid);
+				if (mapUid) this.showMapInfo(message, mapUid);
 			}
 		}
 
 		// Detect Mania Exchange map links.
 		else if (message.content.toLowerCase().indexOf('mania-exchange.com') >= 0) {
-			if (!message.member) return;
-
+			
 			var explode = message.content.split('/');
 			var botGuild = this.getBotGuild(message.guild);
-			botGuild.name = message.guild.name;
-			botGuild.lastTextChannel = message.channel;
+			if (botGuild) {
+				botGuild.name = message.guild.name;
+				botGuild.lastTextChannel = message.channel;
+			}
+
 			var site = false;
 			var mxid = 0;
 
@@ -927,18 +981,22 @@ class GalaxyBot {
 	/**
 	 * Create servers list of specific title.
 	 *
-	 * @param {Guild} botGuild - The guild command was executed in.
+	 * @param {Message} message - Message which requested servers list.
 	 * @param {Object} servers - ManiaPlanet servers list.
 	 * @param {String} titleUid - Id of the title.
 	 */
-	serversList(botGuild, servers, titleUid) {
+	serversList(message, servers, titleUid) {
+		if (!message || !servers || !titleUid) return;
+
+		var botGuild = this.getBotGuild(message.guild);
 		this.log(botGuild, 'Obtained servers list.');
+
 		this.maniaplanet.title(titleUid, title => {
 			this.log(botGuild, 'Obtained title information.');
 
 			// Title not found.
 			if (!title || title.code == 404) {
-				botGuild.lastTextChannel.send(this.compose("Sorry, I can't recognize the **%1** title... :shrug:", titleUid));
+				message.channel.send(this.compose("Sorry, I can't recognize the **%1** title... :shrug:", titleUid));
 				this.log(botGuild, 'Title not found: ' + titleUid);
 				return;
 			}
@@ -947,7 +1005,7 @@ class GalaxyBot {
 
 			// No servers were found.
 			if (servers.length <= 0) {
-				botGuild.lastTextChannel.send(this.compose('Looks like there are no online servers in **%1** right now. :rolling_eyes:', titleName));
+				message.channel.send(this.compose('Looks like there are no online servers in **%1** right now. :rolling_eyes:', titleName));
 				this.log(botGuild, 'No servers found in title: ' + titleUid);
 				return;
 			}
@@ -971,7 +1029,7 @@ class GalaxyBot {
 			}
 
 			var embed = '```'+serversInfo.join('\n')+'```';
-			botGuild.lastTextChannel.send(messageHeader + embed);
+			message.channel.send(messageHeader + embed);
 			this.log(botGuild, this.compose('Found %1 servers in %2', servers.length, titleUid));
 		});
 	}
@@ -979,11 +1037,13 @@ class GalaxyBot {
 	/**
 	 * Show information box about specific title.
 	 *
-	 * @param {Guild} botGuild - The guild to send title information to.
+	 * @param {Message} message - Message which requested title info.
 	 * @param {String} titleUid - UID of the title to display.
 	 */
-	showTitleInfo(botGuild, titleUid) {
-		if (!botGuild || !titleUid) return;
+	showTitleInfo(message, titleUid) {
+		if (!message || !titleUid) return;
+
+		var botGuild = this.getBotGuild(message.guild);
 		this.log(botGuild, 'Downloading title info: ' + titleUid);
 
 		this.maniaplanet.title(titleUid, title => {
@@ -1050,7 +1110,7 @@ class GalaxyBot {
 				timestamp: new Date(title.last_update * 1000).toISOString()
 			});
 
-			botGuild.lastTextChannel.send(embed);
+			message.channel.send(embed);
 			this.log(botGuild, 'Successfully sent title info: ' + titleUid);
 		});
 	}
@@ -1058,11 +1118,13 @@ class GalaxyBot {
 	/**
 	 * Show information box about specific map.
 	 *
-	 * @param {Guild} botGuild - The guild to send map information to.
+	 * @param {Message} message - Message which requested map info.
 	 * @param {String} mapUid - UID of the map to display.
 	 */
-	showMapInfo(botGuild, mapUid) {
-		if (!botGuild || !mapUid) return;
+	showMapInfo(message, mapUid) {
+		if (!message || !mapUid) return;
+
+		var botGuild = this.getBotGuild(message.guild);
 		this.log(botGuild, 'Downloading map info: ' + mapUid);
 
 		this.maniaplanet.map(mapUid, map => {
@@ -1086,7 +1148,7 @@ class GalaxyBot {
 					'[**Download**]('+map.download_url+')'
 			});
 
-			botGuild.lastTextChannel.send(embed);
+			message.channel.send(embed);
 			this.log(botGuild, 'Successfully sent map info: ' + mapUid);
 		});
 	}
@@ -1094,11 +1156,13 @@ class GalaxyBot {
 	/**
 	 * Show current episode played in channel.
 	 *
-	 * @param {Guild} botGuild - Guild to send current episode info.
+	 * @param {Message} message - Message which requested channel current episode.
 	 * @param {String} channelId - ID of the channel to get current episode.
 	 */
-	showCurrentEpisode(botGuild, channelId) {
-		if (!botGuild || !channelId) return;
+	showCurrentEpisode(message, channelId) {
+		if (!message || !channelId) return;
+
+		var botGuild = this.getBotGuild(message.guild);
 		this.log(botGuild, 'Downloading current channel episode: ' + channelId);
 
 		var endtime = parseInt(Date.now() / 1000);
@@ -1124,7 +1188,7 @@ class GalaxyBot {
 				image: { url: episode.program.image_url }
 			});
 
-			botGuild.lastTextChannel.send(embed);
+			message.channel.send(embed);
 			this.log(botGuild, 'Successfully sent current episode: ' + channelId);
 		});
 	}
@@ -1132,12 +1196,14 @@ class GalaxyBot {
 	/**
 	 * Show information about ManiaExchange map.
 	 *
-	 * @param {Guild} botGuild - Guild to send map info.
+	 * @param {Message} message - Message which requested title info.
 	 * @param {String} exchange - Site from which info was abtained.
 	 * @param {Object} mapInfo - Information about the map.
 	 */
-	showMXInfo(botGuild, exchange, mapInfo) {
-		if (!botGuild || !exchange || !mapInfo) return;
+	showMXInfo(message, exchange, mapInfo) {
+		if (!message || !exchange || !mapInfo) return;
+
+		var botGuild = this.getBotGuild(message.guild);
 
 		var mxid = 0;
 		if (mapInfo.TrackID) mxid = mapInfo.TrackID;
@@ -1209,7 +1275,7 @@ class GalaxyBot {
 			timestamp: mapInfo.UpdatedAt
 		});
 
-		botGuild.lastTextChannel.send(embed);
+		message.channel.send(embed);
 		this.log(botGuild, 'Successfully sent MX map info: ' + mapInfo.Name);
 	}
 }

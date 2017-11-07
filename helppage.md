@@ -4,6 +4,7 @@ General
 **%2dommy** - summon <:dommy:372752763085520907> Dommy out of nowhere!
 **%2git** - Wanna see how I was made? ( ͡° ͜ʖ ͡°) I'll link you my source code on GitHub!
 **%2invite** - If you want me to join your server, use this command!
+**%2avatar [name]** - Sends you direct link to your or someone's avatar.
 
 Music player
 **%2play <url> [now|next]** - I'm gonna join your voice channel and play the requested track for you!
