@@ -47,7 +47,7 @@ Available bot settings, which server administrators can tweak to customize bot b
 
 ## Screenshots
 
-![Lagoon title card](https://i.imgur.com/7XQVvuE.png)
-![Music player](https://i.imgur.com/SuogF37.png)
-![ShootMania channel](https://i.imgur.com/u9tNQyU.png)
-![Mania Exchange map](https://i.imgur.com/6sLhjAD.png)
+![Lagoon title card](https://i.imgur.com/n41wMvK.png)
+![Music player](https://i.imgur.com/hGyRSFq.png)
+![ShootMania channel](https://i.imgur.com/95Z3hSG.png)
+![Mania Exchange map](https://i.imgur.com/2FIayqY.png)
