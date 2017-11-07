@@ -57,12 +57,9 @@ class Track {
 				return;
 			}
 
-			var filters = null;
-			if (!info.live_playback) filters = {filter: 'audioonly'};
-			
 			// Create stream.
 			try {
-				this.stream = ytdl(this.url, filters);
+				this.stream = ytdl(this.url, (info.live_playback ? null : {filter: 'audioonly'}));
 				this.stream.on("info", info => {
 					callback(this);
 				});
@@ -198,7 +195,7 @@ class Track {
 			thumbnail: {
 				url: this.thumbnail
 			},
-			description: 'Duration: ' + this.timeToText(parseInt(this.duration)),
+			description: (this.isLivestream ? 'Livestream' : 'Duration: ' + this.timeToText(parseInt(this.duration))),
 			footer: {
 				text: this.sender.displayName,
 				icon_url: this.sender.user.avatarURL

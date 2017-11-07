@@ -823,6 +823,85 @@ class GalaxyBot {
 				message.channel.send(this.compose("I'm active in **%1** server%2: %3.", this.client.guilds.size, (this.client.guilds.size == 1 ? '' : 's'), serversNames.join(', ')));
 				break;
 			}
+
+			case 'set' : {
+				
+
+				const possibleSet = {
+					'prefix': 'Character used to indicate commands.',
+					'embed-mx': 'Detect and send Mania Exchange links.',
+					'embed-titles': 'Detect and send ManiaPlanet titles links.',
+					'embed-maps': 'Detect and send ManiaPlanet maps links.',
+					'roles': 'Roles with permissions to manage GalaxyBot, separated by a comma.'
+				};
+
+				if (args.length <= 0) {
+					message.channel.send(this.compose('To change a setting, specify `name` and `value` in this command. Available settings are: %1.', Object.keys(possibleSet).join(', ')));
+					this.log(botGuild, 'Invalid command params: no setting name specified.');
+					return;
+				}
+
+				const settingName = args[0];
+
+				// Unknown setting.
+				if (!possibleSet[settingName]) {
+					message.channel.send(this.compose('Unknown setting: **%1**. Send empty `settings` command to see available settings.', settingName));
+					this.log(botGuild, 'Unknown setting: ' + settingName);
+					return;
+				}
+
+				// Show setting description and name.
+				if (args.length == 1) {
+					this.log('Showing description of setting: ' + settingName);
+					const isDefined = botGuild.settings[settingName];
+
+					message.channel.send(new Discord.RichEmbed({
+						title: settingName,
+						fields: [{
+							name: 'Description',
+							value: possibleSet[settingName]
+						}, {
+							name: 'Current value',
+							value: (isDefined ? botGuild.settings[settingName] : 'Undefined')
+						}]
+					}));
+					return;
+				}
+
+				// Setting value.
+				args.shift();
+				const settingValue = args.join(' ');
+
+				// Initialize settings.
+				if (!botGuild.settings) botGuild.settings = new Object();
+
+				switch (settingName) {
+					case 'prefix' : {
+						if (settingValue.length != 1) {
+							message.channel.send('Prefix can be only 1 character long!');
+							return;
+						}
+						
+						if (settingValue == ' ') {
+							message.channel.send("Prefix can't be set to white space.");
+							return;
+						}
+
+						if (settingValue == this.config.prefix) {
+							message.channel.send('Prefix set to default value');
+							botGuild.settings[settingName] = false;
+							return;
+						}
+
+						message.channel.send(this.compose('Prefix set to **%1**.', settingValue));
+						botGuild.settings[settingName] = settingValue;
+					}
+				}
+
+				botGuild.saveSettings();
+				this.log(botGuild, 'Updated settings of guild: ' + botGuild.name);
+				break;
+			}
 		}
 	}
 
