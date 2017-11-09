@@ -1,3 +1,2 @@
 const GalaxyBot = require('./GalaxyBot');
-const bot = new GalaxyBot();
-bot.start();
+const galaxybot = new GalaxyBot();

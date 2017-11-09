@@ -35,8 +35,10 @@ class GalaxyBot {
 
 		this.maniaplanet = new ManiaPlanet();
 		this.mx = new ManiaExchange();
-
+		this.config = false;
 		this.activeGuilds = [];
+
+		this.start();
 	}
 
 	/**
@@ -46,7 +48,7 @@ class GalaxyBot {
 	 * @param {String} text - The log content.
 	 */
 	log(botGuild, text) {
-		var time = new Date().getTime();
+		var time = new Date().toLocaleString();
 		var guildName = 'GLOBAL';
 		if (botGuild) guildName = botGuild.name;
 		console.log('['+time+'] ['+guildName+'] ' + text);
@@ -109,15 +111,6 @@ class GalaxyBot {
 		this.client.guilds.forEach((guild, guildId) => {
 			var botGuild = this.getBotGuild(guild);
 		});
-
-		/*
-		this.client.guilds.forEach((guild, guildId) => {
-			guild.members.forEach((member, memberId) => {
-				if (member.user.id != this.client.user.id) return;
-				member.setNickname('');
-			});
-		});
-		*/
 	}
 
 	/**
@@ -979,6 +972,11 @@ class GalaxyBot {
 					if (mapInfo) this.showMXInfo(message, site, mapInfo[0]);
 				});
 			}
+		}
+
+		// Pineapple does NOT go on pizza.
+		else if (message.content.match('pizza') && message.content.match('pineapple')) {
+			message.reply("I really hope you don't have pineapple on your pizza");
 		}
 
 		// Reddit, pretty much.
