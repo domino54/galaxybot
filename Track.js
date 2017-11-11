@@ -1,8 +1,8 @@
-const Discord = require('discord.js');
-const ytdl = require('ytdl-core');
-const HTTPS = require('https');
-const URL = require('url');
-const FB = require('fb');
+const Discord = require("discord.js");
+const ytdl = require("ytdl-core");
+const HTTPS = require("https");
+const URL = require("url");
+const FB = require("fb");
 
 /**
  * The Track class.
@@ -20,9 +20,9 @@ class Track {
 		this.sender = sender;
 		this.url = url;
 		this.author = false;
-		this.title = 'Unknown';
-		this.description = '';
-		this.thumbnail = '';
+		this.title = "Unknown";
+		this.description = "";
+		this.thumbnail = "";
 		this.duration = 0;
 		this.color = 0x000000;
 		this.isLivestream = false;
@@ -41,7 +41,7 @@ class Track {
 		else if (url.match(/(streamable\.com)\/([a-z0-9]{5})/)) this.loadStreamable(callback);
 
 		// Unknown.
-		else callback('unsupported');
+		else callback("unsupported");
 	}
 
 	/**
@@ -59,7 +59,7 @@ class Track {
 
 			// Create stream.
 			try {
-				this.stream = ytdl(this.url, (info.live_playback ? null : {filter: 'audioonly'}));
+				this.stream = ytdl(this.url, (info.live_playback ? null : {filter: "audioonly"}));
 				this.stream.on("info", info => {
 					callback(this);
 				});
@@ -78,7 +78,7 @@ class Track {
 			}
 			this.title = info.title;
 			this.description = info.description;
-			this.thumbnail = 'http://img.youtube.com/vi/'+info.video_id+'/mqdefault.jpg';;
+			this.thumbnail = "http://img.youtube.com/vi/"+info.video_id+"/mqdefault.jpg";;
 			this.duration = info.length_seconds;
 			this.color = 0xCC181E;
 			this.isLivestream = info.live_playback;
@@ -93,20 +93,20 @@ class Track {
 	 */
 	loadFacebook(callback) {
 		var temp = this.url.match(/\/videos\/[0-9]+/)[0];
-		var explode = temp.split('/');
+		var explode = temp.split("/");
 		var videoId = explode.pop();
 
-		FB.api('/'+videoId, { fields: ['source', 'length', 'from', 'title', 'picture', 'live_status'] }, response => {
+		FB.api("/"+videoId, { fields: ["source", "length", "from", "title", "picture", "live_status"] }, response => {
 			if (!response || response.error) {
-				console.log(!response ? 'Facebook: Error occurred while getting track info.' : response.error);
+				console.log(!response ? "Facebook: Error occurred while getting track info." : response.error);
 				callback(false);
 				return;
 			}
 			
 			this.author = {
 				name: response.from.name,
-				url: 'https://www.facebook.com/' + response.from.id,
-				icon_url: 'http://graph.facebook.com/'+response.from.id+'/picture?type=normal'
+				url: "https://www.facebook.com/" + response.from.id,
+				icon_url: "http://graph.facebook.com/"+response.from.id+"/picture?type=normal"
 			};
 			this.sourceURL = response.source;
 			this.title = response.title;
@@ -126,29 +126,29 @@ class Track {
 	 * @param {Function} callback - Function to call when Streamable info is obtained.
 	 */
 	loadStreamable(callback) {
-		var explode = this.url.split('/');
-		var videoURL = 'https://api.streamable.com/videos/' + explode.pop();
+		var explode = this.url.split("/");
+		var videoURL = "https://api.streamable.com/videos/" + explode.pop();
 		
 		HTTPS.get(videoURL, response => {
-			var body = '';
-			response.on('data', (data) => { body += data; })
-			response.on('end', () => {
+			var body = "";
+			response.on("data", (data) => { body += data; })
+			response.on("end", () => {
 				try {
 					var info = JSON.parse(body);
-					if (!info.files['mp4-mobile']) {
+					if (!info.files["mp4-mobile"]) {
 						callback(false);
 						return;
 					}
-					var file = info.files['mp4-mobile'];
+					var file = info.files["mp4-mobile"];
 
 					this.author = {
-						name: 'Streamable',
-						url: 'https://streamable.com/',
-						icon_url: 'https://pbs.twimg.com/profile_images/601124726832955393/GYp5MlPf_400x400.png'
+						name: "Streamable",
+						url: "https://streamable.com/",
+						icon_url: "https://pbs.twimg.com/profile_images/601124726832955393/GYp5MlPf_400x400.png"
 					};
-					this.sourceURL = 'https:' + file.url;
+					this.sourceURL = "https:" + file.url;
 					this.title = info.title;
-					this.thumbnail = 'https:' + info.thumbnail_url;
+					this.thumbnail = "https:" + info.thumbnail_url;
 					this.duration = file.duration;
 					this.color = 0x0F90FA;
 					this.embed = this.createEmbed();
@@ -175,9 +175,9 @@ class Track {
 		var secs = time % 60;
 		var output = "";
 
-		if (hours > 0) output += '' + hours + ':' + (mins < 10 ? '0' : '');
-		output += '' + mins + ':' + (secs < 10 ? '0' : '');
-		output += '' + secs;
+		if (hours > 0) output += "" + hours + ":" + (mins < 10 ? "0" : "");
+		output += "" + mins + ":" + (secs < 10 ? "0" : "");
+		output += "" + secs;
 		return output;
 	}
 
@@ -195,7 +195,7 @@ class Track {
 			thumbnail: {
 				url: this.thumbnail
 			},
-			description: (this.isLivestream ? 'Livestream' : 'Duration: ' + this.timeToText(parseInt(this.duration))),
+			description: (this.isLivestream ? "Livestream" : "Duration: " + this.timeToText(parseInt(this.duration))),
 			footer: {
 				text: this.sender.displayName,
 				icon_url: this.sender.user.avatarURL

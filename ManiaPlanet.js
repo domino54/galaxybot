@@ -1,37 +1,37 @@
-const https = require('https');
-const querystring = require('querystring');
-const hostname = 'v4.live.maniaplanet.com';
+const https = require("https");
+const querystring = require("querystring");
+const hostname = "v4.live.maniaplanet.com";
 
 // For formatting strip: ManiaPlanet formatting codes.
-const formatSkip1 = ['g', 'h', 'i', 'l', 'm', 'n', 'o', 'p', 's', 't', 'w', 'z', '<', '>'];
-const formatSkip3 = ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'a', 'b', 'c', 'd', 'e', 'f'];
+const formatSkip1 = ["g", "h", "i", "l", "m", "n", "o", "p", "s", "t", "w", "z", "<", ">"];
+const formatSkip3 = ["0", "1", "2", "3", "4", "5", "6", "7", "8", "9", "a", "b", "c", "d", "e", "f"];
 
 // Common titles short codes.
 const commonTitles = {
-	'canyon': 'TMCanyon@nadeo',
-	'storm': 'SMStorm@nadeo',
-	'stadium': 'TMStadium@nadeo',
-	'valley': 'TMValley@nadeo',
-	'lagoon': 'TMLagoon@nadeo',
-	'galaxy': 'GalaxyTitles@domino54',
-	'pursuit': 'Pursuit@domino54',
-	'pursuit-s': 'PursuitStadium@domino54',
-	'royal': 'SMStormRoyal@nadeolabs',
-	'siege': 'SMStormSiege@nadeolabs',
-	'battle': 'SMStormBattle@nadeolabs',
-	'elite': 'SMStormElite@nadeolabs',
-	'combo': 'SMStormCombo@nadeolabs',
-	'joust': 'SMStormJoust@nadeolabs',
-	'warlords': 'SMStormWarlords@nadeolabs',
-	'heroes': 'SMStormHeroes@nadeolabs',
-	'tm2': 'Trackmania_2@nadeolabs',
-	'competition': 'esl_comp@lt_forever',
-	'rpg': 'RPG@tmrpg',
-	'obstacle': 'obstacle@smokegun',
-	'stormium': 'GEs@guerro',
-	'infection': 'infection@dmark',
-	'speedball': 'SpeedBall@steeffeen',
-	'alpine': 'TMOneAlpine@florenzius'
+	"canyon": "TMCanyon@nadeo",
+	"storm": "SMStorm@nadeo",
+	"stadium": "TMStadium@nadeo",
+	"valley": "TMValley@nadeo",
+	"lagoon": "TMLagoon@nadeo",
+	"galaxy": "GalaxyTitles@domino54",
+	"pursuit": "Pursuit@domino54",
+	"pursuit-s": "PursuitStadium@domino54",
+	"royal": "SMStormRoyal@nadeolabs",
+	"siege": "SMStormSiege@nadeolabs",
+	"battle": "SMStormBattle@nadeolabs",
+	"elite": "SMStormElite@nadeolabs",
+	"combo": "SMStormCombo@nadeolabs",
+	"joust": "SMStormJoust@nadeolabs",
+	"warlords": "SMStormWarlords@nadeolabs",
+	"heroes": "SMStormHeroes@nadeolabs",
+	"tm2": "Trackmania_2@nadeolabs",
+	"competition": "esl_comp@lt_forever",
+	"rpg": "RPG@tmrpg",
+	"obstacle": "obstacle@smokegun",
+	"stormium": "GEs@guerro",
+	"infection": "infection@dmark",
+	"speedball": "SpeedBall@steeffeen",
+	"alpine": "TMOneAlpine@florenzius"
 };
 
 // Write complete ManiaPlanet node SDK?
@@ -54,10 +54,10 @@ class ManiaPlanet {
 	 * @returns {String} String without formatting.
 	 */
 	stripFormatting(string) {
-		var output = '';
+		var output = "";
 		for (var i = 0; i < string.length; i++) {
 			var char = string[i];
-			if (char != '$') { output += char; continue; }
+			if (char != "$") { output += char; continue; }
 			if (i + 1 > string.length) break;
 			var nextChar = string[i+1].toLowerCase();
 			if (formatSkip1.indexOf(nextChar) > -1) i++;
@@ -76,12 +76,12 @@ class ManiaPlanet {
 	httpsGet(path, query, callback) {
 		https.get({
 			hostname: hostname,
-			path: '/webservices/' + path + '?' + querystring.stringify(query)
+			path: "/webservices/" + path + "?" + querystring.stringify(query)
 		}, response => {
-			var body = '';
-			response.on('data', data => { body += data; });
-			response.on('end', () => { callback(body); });
-			response.on('error', error => { console.log(error); });
+			var body = "";
+			response.on("data", data => { body += data; });
+			response.on("end", () => { callback(body); });
+			response.on("error", error => { console.log(error); });
 		});
 	}
 
@@ -94,7 +94,7 @@ class ManiaPlanet {
 	 * @param {Function} callback - Function to call when request is finished.
 	 */
 	episodes(channelId, startDate, endDate, callback) {
-		this.httpsGet('channels/'+channelId+'/episodes', { 'start_date': startDate, 'end_date': endDate }, body => {
+		this.httpsGet("channels/"+channelId+"/episodes", { "start_date": startDate, "end_date": endDate }, body => {
 			var result = JSON.parse(body);
 			callback(result);
 		});
@@ -107,7 +107,7 @@ class ManiaPlanet {
 	 * @param {Function} callback - Function to call when request is finished.
 	 */
 	map(mapUid, callback) {
-		this.httpsGet('maps/'+mapUid, null, body => {
+		this.httpsGet("maps/"+mapUid, null, body => {
 			var result = JSON.parse(body);
 			callback(result);
 		});
@@ -120,7 +120,7 @@ class ManiaPlanet {
 	 * @param {Function} callback - Function to call when request is finished.
 	 */
 	servers(options, callback) {
-		this.httpsGet('servers/online', options, body => {
+		this.httpsGet("servers/online", options, body => {
 			var result = JSON.parse(body);
 			callback(result);
 		});
@@ -133,7 +133,7 @@ class ManiaPlanet {
 	 * @param {Function} callback - Function to call when request is finished.
 	 */
 	title(titleUid, callback) {
-		this.httpsGet('../ingame/public/titles/'+titleUid, null, body => {
+		this.httpsGet("../ingame/public/titles/"+titleUid, null, body => {
 			var result = JSON.parse(body);
 			callback(result);
 		});
