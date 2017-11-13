@@ -13,6 +13,7 @@ const Track = require("./Track");
 const Guild = require("./Guild");
 const ManiaPlanet = require("./ManiaPlanet");
 const ManiaExchange = require("./ManiaExchange");
+const Units = require("./Units");
 
 /**
  * The GalaxyBot itself.
@@ -35,6 +36,7 @@ class GalaxyBot {
 
 		this.maniaplanet = new ManiaPlanet();
 		this.mx = new ManiaExchange();
+		this.units = new Units();
 		this.config = false;
 		this.activeGuilds = [];
 
@@ -915,6 +917,12 @@ class GalaxyBot {
 		if (message.author != this.client.user && message.content.indexOf(this.client.user.id) >= 0) {
 			message.channel.send(this.compose("<@%1>, need help with anything? Type **%2help** to see my commands! :raised_hands:", message.author.id, commandPrefix));
 		}
+
+		// Convert units.
+		this.units.findAndConvert(message.content, values => {
+			if (!values || values.length <= 0) return;
+			message.reply("you mean " + values.join("; ") + ", right?");
+		});
 
 		// Check if message contains something about ManiaPlanet.
 		if (message.content.toLowerCase().indexOf("maniaplanet") >= 0) {
