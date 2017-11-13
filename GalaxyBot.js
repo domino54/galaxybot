@@ -64,7 +64,10 @@ class GalaxyBot {
 
 		// Load help page.
 		fs.readFile("./helppage.md", "utf8", (error, data) => {
-			if (error) return console.log(error);
+			if (error) {
+				console.log(error);
+				return;
+			}
 			this.helpPage = data;
 		});
 		
@@ -884,6 +887,14 @@ class GalaxyBot {
 				this.editSetting(message, settingName, settingValue);
 				break;
 			}
+
+			// Bot local time.
+			case "time" : {
+				const date = new Date();
+				const hours = date.getHours(), mins = date.getMinutes();
+				message.channel.send(this.compose("It's **%1** for me!", hours+":"+mins));
+				break;
+			}
 		}
 	}
 
@@ -920,6 +931,7 @@ class GalaxyBot {
 
 		// Convert units.
 		this.units.findAndConvert(message.content, values => {
+			if (!this.getSetting(botGuild, "unit-convert")) return;
 			if (!values || values.length <= 0) return;
 			message.reply("you mean " + values.join("; ") + ", right?");
 		});
@@ -1387,7 +1399,8 @@ class GalaxyBot {
 			"embed-titles": "Detect and send ManiaPlanet titles links.",
 			"embed-maps": "Detect and send ManiaPlanet maps links.",
 			"roles": "Roles with permissions to manage GalaxyBot.",
-			"max-duration": "Maximum duration (in seconds) of music tracks users without full permissions can play. 0 = no limit."
+			"max-duration": "Maximum duration (in seconds) of music tracks users without full permissions can play. 0 = no limit.",
+			"unit-convert": "Convert imperial (retarded) unit system values into metric."
 		};
 
 		// Setting not specified.
@@ -1429,7 +1442,8 @@ class GalaxyBot {
 				// Mania Exchange and ManiaPlanet links embedding.
 				case "embed-mx" :
 				case "embed-titles" :
-				case "embed-maps" : {
+				case "embed-maps" : 
+				case "unit-convert" : {
 					settingValue = settingValue.toLowerCase();
 
 					// Setting must be boolean.

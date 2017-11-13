@@ -1,0 +1,22 @@
+[
+	{
+		"names": ["inches"],
+		"target": "cm",
+		"ratio": 2.54
+	},
+	{
+		"names": ["foot", "feet", "ft"],
+		"target": "cm",
+		"ratio": 30.48
+	},
+	{
+		"names": ["yards", "yd"],
+		"target": "m",
+		"ratio": 0.9144
+	},
+	{
+		"names": ["miles"],
+		"target": "km",
+		"ratio": 1.609344
+	}
+]
