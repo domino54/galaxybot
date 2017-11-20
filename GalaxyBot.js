@@ -930,11 +930,13 @@ class GalaxyBot {
 		}
 
 		// Convert units.
+		/*
 		this.units.findAndConvert(message.content, values => {
 			if (!this.getSetting(botGuild, "unit-convert")) return;
 			if (!values || values.length <= 0) return;
 			message.reply("you mean " + values.join("; ") + ", right?");
 		});
+		*/
 
 		// Check if message contains something about ManiaPlanet.
 		if (message.content.toLowerCase().indexOf("maniaplanet") >= 0) {
