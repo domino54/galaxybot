@@ -9,15 +9,15 @@ Reference: `command <mandatory> [optional]`.
 
 ### General
 
-| Command                  | Description |
-|:------------------------:| ----------- |
-| `dommy`                  | Mentions [Dommy](https://github.com/domino54/) with a thinking gif. 🤔
-| `git`                    | Paste a link to this repository.
-| `invite`                 | Sends link allowing users to add the bot to their server.
-| `guilds`                 | Lists all servers the bot is currently in. Available only to the bot owner, via direct message.
-| `avatar [name]`          | Sends you direct link to your or someone's avatar.
-| `setting [name] <value>` | Manage bot settings in the server. See the [settings list](#Settings) below for more information.
-| `time`                   | Current time of the bot server machine.
+| Command                   | Description |
+|:-------------------------:| ----------- |
+| `dommy`                   | Mentions [Dommy](https://github.com/domino54/) with a thinking gif. 🤔
+| `git`                     | Paste a link to this repository.
+| `invite`                  | Sends link allowing users to add the bot to their server.
+| `guilds`                  | Lists all servers the bot is currently in. Available only to the bot owner, via direct message.
+| `avatar [name]`           | Sends you direct link to your or someone's avatar.
+| `settings [name] <value>` | Manage bot settings in the server. See the [settings list](#Settings) below for more information.
+| `time`                    | Current time of the bot server machine.
 
 ### ManiaPlanet
 
