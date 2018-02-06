@@ -40,6 +40,9 @@ class Track {
 		// Streamable
 		else if (url.match(/(streamable\.com)\/([a-z0-9]{5})/)) this.loadStreamable(callback);
 
+		// File.
+		else if (url.match(/(\.mp3)|(\.ogg)|(\.wav)|(\.flac)|(\.m4a)/)) this.loadArbitrary(callback);
+
 		// Unknown.
 		else callback("unsupported");
 	}
@@ -160,6 +163,20 @@ class Track {
 				}
 			})
 		});
+	}
+
+	/**
+	 * Add an arbitrary file.
+	 *
+	 * @param {Function} callback - Function to call when track info is ready.
+	 */
+	loadArbitrary(callback) {
+		this.sourceURL = this.url;
+		this.title = this.url.split("/").pop();
+		this.color = 0x1A96CA;
+		this.embed = this.createEmbed();
+
+		callback(this);
 	}
 
 	/**

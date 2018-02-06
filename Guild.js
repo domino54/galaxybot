@@ -14,11 +14,15 @@ class Guild {
 	constructor(guildId) {
 		this.id = guildId;
 		this.name = "";
+
 		this.lastTextChannel = false;
 		this.voiceConnection = false;
 		this.voiceDispatcher = false;
 		this.currentTrack = false;
 		this.tracksQueue = [];
+
+		this.latestTimeMinute = -1;
+		this.sameTimeStreak = 0;
 
 		// Guild settings file.
 		this.settings = false;

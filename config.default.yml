@@ -17,4 +17,6 @@ settings:
   embed-maps:     true
   roles:          GalaxyBot
   max-duration:   600
-  unit-convert:   true
+  unit-convert:   false
+  music-cmd-ch:   []
+  stalk-edits:    false

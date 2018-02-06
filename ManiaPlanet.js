@@ -54,16 +54,12 @@ class ManiaPlanet {
 	 * @returns {String} String without formatting.
 	 */
 	stripFormatting(string) {
-		var output = "";
-		for (var i = 0; i < string.length; i++) {
-			var char = string[i];
-			if (char != "$") { output += char; continue; }
-			if (i + 1 > string.length) break;
-			var nextChar = string[i+1].toLowerCase();
-			if (formatSkip1.indexOf(nextChar) > -1) i++;
-			if (formatSkip3.indexOf(nextChar) > -1) i += 3;
+		if (typeof(string) !== "string") {
+			return string;
 		}
-		return output;
+		
+		// BOOTYFUL REGEX
+		return string.replace(/\$([0-9a-fA-F]{3}|([hlpHLP]\[.+\])|[a-zA-Z<>])/g, "");
 	}
 
 	/**

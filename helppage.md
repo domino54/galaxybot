@@ -5,6 +5,8 @@ General
 **%2git** - Wanna see how I was made? ( ͡° ͜ʖ ͡°) I'll link you my source code on GitHub!
 **%2invite** - If you want me to join your server, use this command!
 **%2avatar [name]** - Sends you direct link to your or someone's avatar.
+**%2settings [name] <value>** - Manage bot settings in the server.
+**%2time** - Current time of the bot server machine.
 
 Music player
 **%2play <url> [now|next]** - I'm gonna join your voice channel and play the requested track for you!
@@ -14,6 +16,7 @@ Music player
 **%2queue** - I will inform you what are the 10 upcoming songs!
 **%2skip** - Skip currently played track, if it's been requested by you.
 **%2stop** - Abort the mission! This command completely stops music playback.
+**%2pause** - Take a break and pause the current track. Same command resumes playback.
 
 ManiaPlanet
 **%2channel <sm|tm>** - See what's currently being played on channels.

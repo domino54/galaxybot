@@ -26,6 +26,7 @@ class GalaxyBot {
 		this.client = new Discord.Client();
 		this.client.on("ready", () => { this.onReady(); });
 		this.client.on("message", message => { this.onMessage(message); });
+		this.client.on("messageUpdate", (messageOld, messageNew) => { this.onEditedMessage(messageOld, messageNew); });
 		this.client.on("channelDelete", channel => { this.onChannelDeleted(channel); });
 		this.client.on("guildDelete", guild => { this.onGuildDelete(guild); })
 
@@ -246,9 +247,10 @@ class GalaxyBot {
 				botGuild.voiceDispatcher = false;
 				this.log(botGuild, "Voice dispatcher end.");
 
-				// Delay is necessary for slower connections to don"t skip next track immediately.
+				// Delay is necessary for slower connections to don't skip next track immediately.
 				setTimeout(() => { this.playNextTrack(botGuild); }, 250);
 			});
+
 			botGuild.voiceDispatcher.on("error", error => {
 				console.log(error);
 			});
@@ -268,21 +270,27 @@ class GalaxyBot {
 		if (!botGuild.lastTextChannel) return;
 
 		// Nothing is being played right now.
-		if (!botGuild.currentTrack)
-			botGuild.lastTextChannel.send("I.m not playing anything right now. Go ahead and request some beats! :butterfly:");
+		if (!botGuild.currentTrack) {
+			botGuild.lastTextChannel.send("I'm not playing anything right now. Go ahead and request some beats! :butterfly:");
+		}
 		
 		// We are playing something.
 		else {
 			var header = "Now playing:";
+
 			if (withMention) {
-				if (botGuild.currentTrack.isLivestream) header = this.compose("I'm tuned up for the livestream, <@%1>! :red_circle:", botGuild.currentTrack.sender.id);
-				else header = this.compose("I'm playing your track now, <@%1>! :metal:", botGuild.currentTrack.sender.id);
+				if (botGuild.currentTrack.isLivestream) {
+					header = this.compose("I'm tuned up for the livestream, <@%1>! :red_circle:", botGuild.currentTrack.sender.id);
+				} else {
+					header = this.compose("I'm playing your track now, <@%1>! :metal:", botGuild.currentTrack.sender.id);
+				}
 			}
 
 			// Current play point.
 			if (!botGuild.currentTrack.isLivestream && !withMention) {
 				const current = botGuild.currentTrack.timeToText(parseInt(botGuild.voiceDispatcher.time / 1000));
 				const total = botGuild.currentTrack.timeToText(botGuild.currentTrack.duration);
+
 				botGuild.currentTrack.embed.description = current+" / "+total;
 			}
 
@@ -397,10 +405,33 @@ class GalaxyBot {
 		// Server-only command in DM.
 		if (!botGuild) {
 			const guildCommands = ["dommy", "play", "undo", "now", "next", "queue", "skip", "stop", "pause", "setting"];
+
 			if (guildCommands.indexOf(name) != -1) {
 				message.channel.send("Sorry, this command works only on servers!");
 				return;
 			}
+		}
+
+		// Update latest text channel for music commands
+		const musicCommands = ["play", "undo", "now", "next", "queue", "skip", "stop", "pause"];
+
+		if (musicCommands.indexOf(name) != -1) {
+			// Ignore command if not seend in exclusive channel
+			var musicTextChannels = this.getSetting(botGuild, "music-cmd-ch");
+
+			if (musicTextChannels.length > 0 && musicTextChannels.indexOf(message.channel.id) == -1) {
+				var channelsTags = [];
+
+				for (var i = 0; i < musicTextChannels.length; i++) {
+					var channelId = musicTextChannels[i];
+					channelsTags.push("<#" + channelId + ">");
+				}
+
+				message.channel.send(this.compose("Can't use music player commands in this channel. Try in %1!", channelsTags.join(", ")));
+				return;
+			}
+
+			botGuild.lastTextChannel = message.channel;
 		}
 		
 		// Log command.
@@ -800,7 +831,7 @@ class GalaxyBot {
 					});
 				}
 
-				// Can"t search in YouTube: API token not provided.
+				// Can't search in YouTube: API token not provided.
 				else if (!this.config.youtube || !this.config.youtube.token) {
 					message.channel.send("I can't search for tracks in YouTube, API token is missing in my configuration file! :rolling_eyes:");
 					this.log(botGuild, "Wrong YouTube configuration: token not specified.");
@@ -861,6 +892,17 @@ class GalaxyBot {
 
 			// List all guilds the bot is active in.
 			case "guilds" : {
+				if (message.author.id != this.config.dommy) {
+					message.channel.send("Sorry, only my creator is allowed to perform this operation.");
+					return;
+				}
+
+				// Privacy is important.
+				if (message.channel.type != "dm") {
+					message.channel.send("For security reasons, I can only send the guilds list in a private message.");
+					return;
+				}
+
 				var serversNames = [];
 				this.client.guilds.forEach((guild, guildId) => {
 					serversNames.push(guild == message.guild ? "**"+guild.name+"**" : guild.name);
@@ -870,7 +912,7 @@ class GalaxyBot {
 			}
 
 			// Change bot settings in guild.
-			case "setting" : {
+			case "settings" : {
 				// No permissions to tweak settings
 				if (!this.hasControlOverBot(message.member)) {
 					message.channel.send(this.compose("Sorry <@%1>, you don't have permissions to modify my settings. :no_entry_sign:", message.member.id));
@@ -892,7 +934,44 @@ class GalaxyBot {
 			case "time" : {
 				const date = new Date();
 				const hours = date.getHours(), mins = date.getMinutes();
-				message.channel.send(this.compose("It's **%1** for me!", hours+":"+mins));
+				const minute = mins + hours * 60;
+				const time = hours + ":" + (mins >= 10 ? mins : "0" + mins);
+
+				// Display time in direct messages
+				if (!botGuild) {
+					message.channel.send(this.compose("It's **%1** for me!", time));
+				}
+
+				else {
+					var diff = minute - botGuild.latestTimeMinute;
+					botGuild.latestTimeMinute = minute;
+
+					if (diff == 0) botGuild.sameTimeStreak += 1;
+					else botGuild.sameTimeStreak = 0;
+					
+					// The AI is an asshole?
+					switch (botGuild.sameTimeStreak) {
+						case 0 : {
+							if (diff == 1) message.channel.send(this.compose("Wow, it's **%1** now. Who'd have guessed one minute has passed.", time));
+							else if (diff <= 5) message.channel.send(this.compose("Wow, it's **%1** now. Who'd have guessed %2 minutes have passed.", time, diff));
+							else message.channel.send(this.compose("It's **%1** for me!", time));
+							break;
+						}
+						case 1 : {
+							message.channel.send(this.compose("It's still **%1**.", time));
+							break;
+						}
+						case 2 : {
+							message.channel.send(this.compose("Are you dumb or what?", time));
+							break;
+						}
+						case 3 : {
+							message.channel.send(this.compose("Fuck off.", time));
+							break;
+						}
+					}
+				}
+
 				break;
 			}
 		}
@@ -904,14 +983,11 @@ class GalaxyBot {
 	 * @param {Message} message - The message to handle.
 	 */
 	onMessage(message) {
-		if (message.author.id == this.client.user.id) return;
+		if (!message.author || message.author.bot || message.author.id == this.client.user.id) return;
 
 		// Get message bot guild.
 		var botGuild = this.getBotGuild(message.guild);
-		if (botGuild) {
-			botGuild.name = message.guild.name;
-			botGuild.lastTextChannel = message.channel;
-		}
+		if (botGuild) botGuild.name = message.guild.name;
 
 		var commandPrefix = this.getSetting(botGuild, "prefix");
 		var isCommand = message.content.startsWith(commandPrefix);
@@ -996,29 +1072,72 @@ class GalaxyBot {
 			}
 		}
 
-		// Pineapple does NOT go on pizza.
-		else if (message.content.match("pizza") && message.content.match("pineapple")) {
-			message.reply("I really hope you don't have pineapple on your pizza");
+		// Responses below DO stack up.
+
+		// React with Tomek.
+		if (message.content.match(/tomek/i)) {
+			message.react("tomkek:400401620078166017");
 		}
 
-		// Reddit, pretty much.
-		else if (message.content.toLowerCase() == "good bot") {
-			message.channel.send(this.compose("Thank you, <@%1>! :heart:", message.author.id));
-		}
-		
-		else if (message.content.toLowerCase() == "bad bot") {
-			message.reply("https://i.giphy.com/media/L7LylDVYU10lO/giphy.webp");
-		}
-
-		// Tomek.
-		else if (message.content.toLowerCase().indexOf("tomek") >= 0) {
-			message.react("tomkek:275271219279036416");
+		// React with Joy.
+		if (message.content.match(/(:joy:)|😂/i)) {
+			message.react("yoy:398111076379525141");
 		}
 
 		// Markiel.
-		else if (message.content.toLowerCase().indexOf("markiel") >= 0) {
+		if (message.content.match(/markiel/i)) {
 			message.react("markiel:258199535673671680");
 			message.channel.send({files: ["./markiel.png"]});
+		}
+
+		// Responses below DO NOT stack up.
+
+		// Pineapple does NOT go on pizza.
+		if (message.content.match(/pizza/i) && message.content.match(/pineapple/i)) {
+			message.reply("I really hope you don't have pineapple on your pizza.");
+		}
+
+		// Reddit, pretty much.
+		else if (message.content.match(/good bot/i)) {
+			message.channel.send(this.compose("Thank you, <@%1>! :heart:", message.author.id));
+		}
+		
+		else if (message.content.match(/bad bot/i)) {
+			message.reply("https://i.giphy.com/media/L7LylDVYU10lO/giphy.webp");
+		}
+
+		// The AI is an asshole?
+		else if (message.content.match(/bot/i) && message.content.match(/asshole/i)) {
+			message.channel.send("The AI is an asshole?");
+		}
+
+		// Is Mei really a bae?
+		else if (message.content.match(/mei/i) && message.content.match(/bae/i)) {
+			var overwatchHeroes = [
+				"Doomfist", "Genji", "McCree", "Pharah", "Reaper", "Soldier: 76", "Sombra", "Tracer",
+				"Bastion", "Hanzo", "Junkrat", "Torbjörn", "Widowmaker", "D. Va", "Orisa", "Reinhardt",
+				"Roadhog", "Winston", "Zarya", "Ana", "Lúcio", "Mercy", "Moira", "Symmetra", "Zenyatta"
+			];
+
+			var rand = Math.floor(Math.random() * (overwatchHeroes.length - 1));
+			var heroName = overwatchHeroes[rand];
+			message.channel.send(this.compose("%1 is far better than Mei, <@%2>.", heroName, message.author.id));
+		}
+	}
+
+	/**
+	 * Fired when someone has edited their message.
+	 *
+	 * @param {Message} messageOld - Old message.
+	 * @param {Message} messageNew - Edited message.
+	 */
+	onEditedMessage(messageOld, messageNew) {
+		// this.onMessage(messageNew);
+		var botGuild = this.getBotGuild(messageNew.guild);
+
+		// Stalk members, who edit their messages.
+		if (botGuild && this.getSetting(botGuild, "stalk-edits")) {
+			messageOld.channel.send("I see you, <@" + messageOld.author.id + ">: ```" + messageOld.content + "```");
 		}
 	}
 
@@ -1132,7 +1251,7 @@ class GalaxyBot {
 		this.maniaplanet.title(titleUid, title => {
 			// Title not found.
 			if (!title || title.code == 404) {
-				botGuild.lastTextChannel.send(this.compose("Sorry, I can't recognize the **%1** title... :shrug:", titleUid));
+				message.channel.send(this.compose("Sorry, I can't recognize the **%1** title... :shrug:", titleUid));
 				this.log(botGuild, "Title not found: " + titleUid);
 				return;
 			}
@@ -1213,7 +1332,7 @@ class GalaxyBot {
 		this.maniaplanet.map(mapUid, map => {
 			// Map not found.
 			if (!map || map.code == 404) {
-				botGuild.lastTextChannel.send(this.compose("Sorry, I couldn't find information about this map: **%1**. :cry:", mapUid));
+				message.channel.send(this.compose("Sorry, I couldn't find information about this map: **%1**. :cry:", mapUid));
 				this.log(botGuild, "Map not found: " + mapUid);
 				return;
 			}
@@ -1254,7 +1373,7 @@ class GalaxyBot {
 		this.maniaplanet.episodes(channelId, starttime, endtime, episodes => {
 			// No episodes found.
 			if (!episodes || episodes.code || episodes.length <= 0) {
-				botGuild.lastTextChannel.send("There's nothing being played in this channel righ now, or we ran into some issue. :thinking:");
+				message.channel.send("There's nothing being played in this channel righ now, or we ran into some issue. :thinking:");
 				this.log(botGuild, "Channel empty or request error: " + channelId);
 				return;
 			}
@@ -1402,7 +1521,9 @@ class GalaxyBot {
 			"embed-maps": "Detect and send ManiaPlanet maps links.",
 			"roles": "Roles with permissions to manage GalaxyBot.",
 			"max-duration": "Maximum duration (in seconds) of music tracks users without full permissions can play. 0 = no limit.",
-			"unit-convert": "Convert imperial (retarded) unit system values into metric."
+			"unit-convert": "Convert imperial (retarded) unit system values into metric.",
+			"music-cmd-ch": "The only channels, where music player commands are accepted.",
+			"stalk-edits": "Mock members for editing their messages."
 		};
 
 		// Setting not specified.
@@ -1445,6 +1566,7 @@ class GalaxyBot {
 				case "embed-mx" :
 				case "embed-titles" :
 				case "embed-maps" : 
+				case "stalk-edits" : 
 				case "unit-convert" : {
 					settingValue = settingValue.toLowerCase();
 
@@ -1454,9 +1576,9 @@ class GalaxyBot {
 						return;
 					}
 
-					var settingBoolean = settingValue == "true";
+					var settingBoolean = settingValue === "true";
 
-					if (settingBoolean == this.config.settings.prefix) {
+					if (settingBoolean == this.config.settings[settingName]) {
 						delete botGuild.settings[settingName];
 					} else {
 						botGuild.settings[settingName] = settingBoolean;
@@ -1496,9 +1618,9 @@ class GalaxyBot {
 
 					// Remove a role.
 					else if (action == "remove") {
-						// Role doesn"t exist.
+						// Role doesn't exist.
 						if (currentRoles.indexOf(roleName) == -1) {
-							message.channel.send("This role doesn't exists.");
+							message.channel.send("This role doesn't exist.");
 							return;
 						}
 						else {
@@ -1538,6 +1660,88 @@ class GalaxyBot {
 					}
 					break;
 				}
+
+				// Music player commands channels.
+				case "music-cmd-ch" : {
+					var explode = settingValue.split(" ");
+					var action = explode.shift();
+					var channelId = explode.join(" ").match(/[0-9]+/g);
+					if (channelId) channelId = channelId.join();
+					
+					var currentChannels = this.config.settings["music-cmd-ch"];
+					if (botGuild.settings["music-cmd-ch"]) currentChannels = botGuild.settings["music-cmd-ch"];
+
+					// Remove channels, which don't exist anymore.
+					if (currentChannels.length > 0) {
+						var guildChannels = [];
+						var cleanedList = [];
+
+						message.guild.channels.forEach((channel, snowflake) => {
+							if (channel.type != "text") return;
+							guildChannels.push(snowflake);
+						});
+
+						for (var i = 0; i < currentChannels.length; i++) {
+							var snowflake = currentChannels[i];
+							if (guildChannels.indexOf(snowflake) == -1) continue;
+							cleanedList.push(snowflake);
+						}
+
+						currentChannels = cleanedList;
+						botGuild.settings["music-cmd-ch"] = currentChannels;
+					}
+
+					// Add new channel.
+					if (action == "add") {
+						var channelExists = false;
+
+						message.guild.channels.forEach((channel, snowflake) => {
+							if (channel.type != "text" || snowflake != channelId) return;
+							channelExists = true;
+						});
+
+						// Channel doesn't exist.
+						if (!channelExists) {
+							message.channel.send("Channel doesn't exist or belongs to another server.");
+							return;
+						}
+						// Channel already exists.
+						else if (currentChannels.indexOf(channelId) != -1) {
+							message.channel.send("This channel is already set.");
+							return;
+						}
+						else {
+							currentChannels.push(channelId);
+							botGuild.settings["music-cmd-ch"] = currentChannels;
+						}
+					}
+
+					// Remove a channel.
+					else if (action == "remove") {
+						// Channel doesn't exist.
+						if (currentChannels.indexOf(channelId) == -1) {
+							message.channel.send("This channel is not specified in the setting.");
+							return;
+						}
+						else {
+							currentChannels.splice(currentChannels.indexOf(channelId), 1);
+							botGuild.settings["music-cmd-ch"] = currentChannels;
+						}
+					}
+
+					// Incorrect action.
+					else {
+						message.channel.send("Specify a valid action to perform: `add` or `remove`.");
+						return;
+					}
+
+					// Remove value if set to default.
+					if (botGuild.settings["music-cmd-ch"].length <= 0) {
+						delete botGuild.settings["music-cmd-ch"];
+					}
+
+					break;
+				}
 			}
 
 			botGuild.saveSettings();
@@ -1545,8 +1749,21 @@ class GalaxyBot {
 		}
 
 		// Show setting description, value and default.
-		const isDefined = botGuild.settings[settingName];
-		const defaultValue = this.config.settings[settingName];
+		const isDefined = botGuild.settings[settingName] !== undefined;
+		var defaultValue = this.config.settings[settingName];
+		var currentValue = isDefined ? botGuild.settings[settingName] : defaultValue;
+
+		// Music player channels.
+		if (settingName == "music-cmd-ch") {
+			defaultValue = "";
+
+			var channelsTags = [];
+			for (var i = 0; i < currentValue.length; i++) {
+				var channelId = currentValue[i];
+				channelsTags.push("<#" + channelId + ">");
+			}
+			currentValue = channelsTags.join(", ");
+		}
 
 		message.channel.send(new Discord.RichEmbed({
 			fields: [{
@@ -1554,11 +1771,11 @@ class GalaxyBot {
 				value: possibleSet[settingName]
 			}, {
 				name: "Current value",
-				value: (isDefined ? botGuild.settings[settingName] : defaultValue),
+				value: (currentValue !== "" ? currentValue : "<undefined>"),
 				inline: true
 			}, {
 				name: "Default value",
-				value: defaultValue,
+				value: (defaultValue !== "" ? defaultValue : "<undefined>"),
 				inline: true
 			}]
 		}));
