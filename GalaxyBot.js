@@ -1136,8 +1136,8 @@ class GalaxyBot {
 		var botGuild = this.getBotGuild(messageNew.guild);
 
 		// Stalk members, who edit their messages.
-		if (botGuild && this.getSetting(botGuild, "stalk-edits")) {
-			messageOld.channel.send("I see you, <@" + messageOld.author.id + ">: ```" + messageOld.content + "```");
+		if (botGuild && this.getSetting(botGuild, "stalk-edits") && messageOld.content != messageNew.content) {
+			messageOld.channel.send("I see you, <@" + messageOld.author.id + ">: ```" + messageOld.content.replace("`", "") + "```");
 		}
 	}
 
