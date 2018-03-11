@@ -1,8 +1,10 @@
 const Discord = require("discord.js");
 const ytdl = require("ytdl-core");
+const metadata = require("music-metadata");
 const HTTPS = require("https");
 const URL = require("url");
 const FB = require("fb");
+const fs = require("fs");
 
 /**
  * The Track class.
@@ -26,16 +28,22 @@ class Track {
 		this.duration = 0;
 		this.color = 0x000000;
 		this.isLivestream = false;
+		this.isLocalFile = false;
 		this.embed = null;
 
 		var hostname = URL.parse(url).hostname;
-		if (!hostname) callback(false);
+
+		// Local file.
+		if (url.match(/^[A-Z]:(\/|\\)/)) this.loadLocalFile(callback);
+		
+		// Unsupported.
+		else if (!hostname) callback(false);
 
 		// YouTube
 		else if (url.match(/(youtube\.com\/watch\?v=|youtu\.be\/)/)) this.loadYouTube(callback);
 
 		// Facebook
-		else if (url.match(/(https:\/\/)?(www\.facebook\.com)\/.*\/videos\/[0-9]+/)) this.loadFacebook(callback);
+		else if (url.match(/(https:\/\/)?(facebook\.com)\/.*\/videos\/[0-9]+/)) this.loadFacebook(callback);
 
 		// Streamable
 		else if (url.match(/(streamable\.com)\/([a-z0-9]{5})/)) this.loadStreamable(callback);
@@ -48,6 +56,46 @@ class Track {
 	}
 
 	/**
+	 * Get track information from local drive.
+	 *
+	 * @param {Function} callback - Function to call when the file info is obtained.
+	 */
+	loadLocalFile(callback) {
+		this.sourceURL = this.url;
+		this.title = this.url.split(/\/|\\/).pop();
+		this.isLocalFile = true;
+		this.url = false;
+
+		// Check if we can access the file.
+		fs.access(this.sourceURL, fs.constants.R_OK, fserror => {
+			if (fserror) {
+				console.log(fserror);
+				callback("file-no-access");
+				return;
+			}
+
+			// Obtain the track metadata.
+			metadata.parseFile(this.sourceURL, { duration: true, skipCovers: true}).then(metadata => {
+				// Track title.
+				if (metadata.common.title) this.title = metadata.common.title;
+
+				// Artist(s) name(s).
+				var artistName = false;
+				if (metadata.common.artist) artistName = metadata.common.artist;
+				if (metadata.common.artists) artistName = metadata.common.artists.join(", ");
+				if (artistName !== false) this.title = artistName + " - " + this.title;
+
+				this.duration = metadata.format.duration;
+				this.embed = this.createEmbed();
+
+				callback(this);
+			}).catch(error => {
+				callback("file-no-metadata");
+			});
+		});
+	}
+
+	/**
 	 * Get track information from YouTube.
 	 *
 	 * @param {Function} callback - Function to call when YouTube info is obtained.
@@ -56,20 +104,20 @@ class Track {
 		ytdl.getInfo(this.url, (error, info) => {
 			if (error) {
 				console.log(error);
-				callback(false);
+				callback("ytdl-no-info");
 				return;
 			}
 
 			// Create stream.
 			try {
-				this.stream = ytdl(this.url, (info.live_playback ? null : {filter: "audioonly"}));
+				this.stream = ytdl(this.url, (info.live_playback ? null : { filter: "audioonly" }));
 				this.stream.on("info", info => {
 					callback(this);
 				});
 			}
 			catch (exception) {
 				console.log(exception);
-				callback(false);
+				callback("yt-stream-fail");
 				return;
 			}
 
@@ -81,7 +129,7 @@ class Track {
 			}
 			this.title = info.title;
 			this.description = info.description;
-			this.thumbnail = "http://img.youtube.com/vi/"+info.video_id+"/mqdefault.jpg";;
+			this.thumbnail = "http://img.youtube.com/vi/" + info.video_id + "/mqdefault.jpg";;
 			this.duration = info.length_seconds;
 			this.color = 0xCC181E;
 			this.isLivestream = info.live_playback;
@@ -102,14 +150,14 @@ class Track {
 		FB.api("/"+videoId, { fields: ["source", "length", "from", "title", "picture", "live_status"] }, response => {
 			if (!response || response.error) {
 				console.log(!response ? "Facebook: Error occurred while getting track info." : response.error);
-				callback(false);
+				callback("fb-no-info");
 				return;
 			}
 			
 			this.author = {
 				name: response.from.name,
 				url: "https://www.facebook.com/" + response.from.id,
-				icon_url: "http://graph.facebook.com/"+response.from.id+"/picture?type=normal"
+				icon_url: "http://graph.facebook.com/" + response.from.id + "/picture?type=normal"
 			};
 			this.sourceURL = response.source;
 			this.title = response.title;
@@ -159,7 +207,7 @@ class Track {
 					callback(this);
 				}
 				catch (error) {
-					callback(false);
+					callback("streamable-error");
 				}
 			})
 		});
@@ -204,11 +252,8 @@ class Track {
 	 * @returns {RichEmbed} Embed containing track information.
 	 */
 	createEmbed() {
-		return new Discord.RichEmbed({
-			author: this.author,
+		var embed = {
 			title: this.title,
-			url: this.url,
-			color: this.color,
 			thumbnail: {
 				url: this.thumbnail
 			},
@@ -217,7 +262,18 @@ class Track {
 				text: this.sender.displayName,
 				icon_url: this.sender.user.avatarURL
 			}
-		});
+		}
+
+		// Color only if not black.
+		if (this.color != 0x000000) embed.color = this.color;
+
+		// Embed author if exists.
+		if (this.author !== false) embed.author = this.author;
+
+		// URL only if valid.
+		if (this.url !== false) embed.url = this.url;
+
+		return new Discord.RichEmbed(embed);
 	}
 }
 

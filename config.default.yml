@@ -10,13 +10,26 @@ facebook:
   appid:  your_application_id
   secret: your_application_secret
 
+logfile:  log.txt
+
+statuses:
+  - "a game"
+
+filter:
+  min:    2
+  max:    20
+  count:  25
+
 settings:
-  prefix:         '!'
+  prefix:         "!"
   embed-mx:       true
   embed-titles:   true
   embed-maps:     true
-  roles:          GalaxyBot
   max-duration:   600
   unit-convert:   false
-  music-cmd-ch:   []
   stalk-edits:    false
+  limit-access:   false
+  enable-filter:  true
+  filter-admins:  false
+  text-responses: true
+  mocking-joy:    true

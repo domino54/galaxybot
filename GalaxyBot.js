@@ -11,6 +11,7 @@ const fs = require("fs");
 // Local classes.
 const Track = require("./Track");
 const Guild = require("./Guild");
+const User = require("./User");
 const ManiaPlanet = require("./ManiaPlanet");
 const ManiaExchange = require("./ManiaExchange");
 const Units = require("./Units");
@@ -27,7 +28,9 @@ class GalaxyBot {
 		this.client.on("ready", () => { this.onReady(); });
 		this.client.on("message", message => { this.onMessage(message); });
 		this.client.on("messageUpdate", (messageOld, messageNew) => { this.onEditedMessage(messageOld, messageNew); });
+		this.client.on("messageReactionAdd", (reaction, user) => { this.onNewReaction(reaction, user); });
 		this.client.on("channelDelete", channel => { this.onChannelDeleted(channel); });
+		this.client.on("guildMemberUpdate", (oldMember, newMember) => { this.onMemberUpdate(oldMember, newMember); });
 		this.client.on("guildDelete", guild => { this.onGuildDelete(guild); })
 
 		process.on("SIGINT", () => { this.end(); });
@@ -36,10 +39,17 @@ class GalaxyBot {
 		process.on("SIGBREAK", () => { this.end(); });
 
 		this.maniaplanet = new ManiaPlanet();
-		this.mx = new ManiaExchange();
+		this.maniaexchange = new ManiaExchange();
 		this.units = new Units();
 		this.config = false;
 		this.activeGuilds = [];
+		this.activeUsers = [];
+		this.logsStream = false;
+
+		this.statusesList = [];
+		this.lastStatus = false;
+
+		this.talkChannel = false;
 
 		this.start();
 	}
@@ -54,7 +64,13 @@ class GalaxyBot {
 		var time = new Date().toLocaleString();
 		var guildName = "GLOBAL";
 		if (botGuild) guildName = botGuild.name;
-		console.log("["+time+"] ["+guildName+"] " + text);
+
+		var message = "["+time+"] ["+guildName+"] " + text;
+		console.log(message);
+
+		if (this.logsStream !== false) {
+			this.logsStream.write(message + "\n");
+		}
 	}
 
 	/**
@@ -81,10 +97,18 @@ class GalaxyBot {
 		// Config file not found.
 		if (!this.config) {
 			console.log("Configuration error: config.yml not found or empty!");
+			return;
 		}
+
+		// Initialize logs.
+		if (typeof(this.config.logfile) === "string") {
+			this.logsStream = fs.createWriteStream(this.config.logfile, { flags: "a" });
+			this.log(false, "Logs will be saved to: " + this.config.logfile);
+		}
+
 		// Discord token not specified.
-		else if (!this.config.discord || !this.config.discord.token) {
-			console.log("Configuration error: Discord token is not specified in config.yml!");
+		if (!this.config.discord || !this.config.discord.token) {
+			this.log(false, "Configuration error: Discord token is not specified in config.yml!");
 		}
 		
 		// Log in to Discord.
@@ -98,6 +122,7 @@ class GalaxyBot {
 				grant_type: "client_credentials"
 			}, response => {
 				if (!response || response.error) {
+					this.log(false, "A problem has occured while connecting to Facebook API.");
 					console.log(!response ? "Facebook: Authentication error." : response.error);
 					return;
 				}
@@ -111,20 +136,59 @@ class GalaxyBot {
 	 */
 	onReady() {
 		this.log(false, "GalaxyBot is ready!");
-		this.client.user.setGame("with Dommy");
+		//this.client.user.setActivity("over you", { type: "WATCHING" });
+
+		// Random statuses.
+		this.pickNextStatus();
+		setInterval(() => { this.pickNextStatus(); }, 30000);
 
 		// Register already existing guilds.
+		var nbGuildsTotal = 0;
 		this.client.guilds.forEach((guild, guildId) => {
 			var botGuild = this.getBotGuild(guild);
+			nbGuildsTotal++;
 		});
+		this.log(false, "Active in " + nbGuildsTotal + " guilds.");
 	}
 
 	/**
 	 * Fired when terminal or console is killed.
 	 */
 	end() {
+		this.log(false, "Stopping GalaxyGot...");
 		this.client.destroy();
+
+		// Stop logs stream.
+		if (this.logsStream !== false) {
+			this.logsStream.end();
+			this.logsStream = false;
+		}
+
 		process.exit();
+	}
+
+	/**
+	 * Cycle through multiple available status messages randomly.
+	 */
+	pickNextStatus() {
+		if (!this.config.statuses || this.config.statuses.length <= 0) return;
+
+		// Refill the statuses list.
+		if (this.statusesList.length <= 0) {
+			this.statusesList = this.config.statuses.slice();
+		}
+
+		var statusText = "";
+
+		for (;;) {
+			var index = Math.floor(Math.random() * (this.statusesList.length - 1));
+			statusText = this.statusesList[index];
+			if (statusText != this.lastStatus || this.statusesList.length <= 1) break;
+		}
+
+		this.statusesList.splice(index, 1);
+		this.client.user.setActivity(statusText);
+		this.lastStatus = statusText;
 	}
 
 	/**
@@ -142,20 +206,6 @@ class GalaxyBot {
 	}
 
 	/**
-	 * Compose a message.
-	 * Replaces nodes (%n) with arguments provided.
-	 *
-	 * @returns {String} The composed message.
-	 */
-	compose() {
-		if (arguments.length == 0) return "";
-		if (arguments.length == 1) return arguments[0];
-		var output = arguments[0];
-		for (var i = 1; i < arguments.length; i++) output = this.replaceAll(output, "%"+i, arguments[i]);
-		return output;
-	}
-
-	/**
 	 * Get the bot guild object of given guild.
 	 *
 	 * @param {Guild} guild - The quild to get bot guild.
@@ -167,11 +217,29 @@ class GalaxyBot {
 			if (guild.id == botGuild.id) return botGuild;
 		}
 
-		// Create new bot guild if doesn"t exist yet.
+		// Create new bot guild if doesn't exist yet.
 		var botGuild = new Guild(guild.id);
 		this.activeGuilds.push(botGuild);
-		this.log(false, "New guild registered: " + guild.name);
+		// this.log(false, "New guild registered: " + guild.name);
 		return botGuild;
+	}
+
+	/**
+	 * Get the bot user object of given user.
+	 *
+	 * @param {User} user - The user too get the object.
+	 * @returns {User} The bot user object.
+	 */
+	getBotUser(user) {
+		if (!user) return false;
+		for (const botUser of this.activeUsers) {
+			if (user.id == botUser.id) return botUser;
+		}
+
+		// Create a new bot user if doesn't exist yet.
+		var botUser = new User(user.id);
+		this.activeUsers.push(botUser);
+		return botUser;
 	}
 
 	/**
@@ -183,14 +251,15 @@ class GalaxyBot {
 	 */
 	hasControlOverBot(member) {
 		if (!member) return false;
-		if (member.id == this.config.dommy || member.hasPermission("ADMINISTRATOR")) return true; ///< I"m the god of this module.
+		if (member.id == this.config.dommy) return true; ///< I'm the god of this module.
+		if (member.id == member.guild.ownerID || member.hasPermission("ADMINISTRATOR")) return true;
 
 		var botGuild = this.getBotGuild(member.guild);
-		var modRoles = this.getSetting(botGuild, "roles").split(",");
+		var modRoles = this.getSetting(botGuild, "roles");
 		var matchingRoles = 0;
 
-		member.roles.forEach((role, roleId) => {
-			if (modRoles.indexOf(role.name) != -1) matchingRoles++;
+		member.roles.forEach((role, snowflake) => {
+			if (modRoles.indexOf(snowflake) != -1) matchingRoles++;
 		});
 
 		return matchingRoles > 0;
@@ -207,6 +276,7 @@ class GalaxyBot {
 		// Leave voice channel if queue is empty.
 		if (botGuild.tracksQueue.length <= 0) {
 			if (botGuild.voiceConnection) botGuild.voiceConnection.channel.leave();
+			this.log(botGuild, "Queue empty, leaving the voice channel.");
 			return;
 		}
 		
@@ -231,11 +301,15 @@ class GalaxyBot {
 			else if (botGuild.currentTrack.sourceURL) {
 				botGuild.voiceDispatcher = botGuild.voiceConnection.playArbitraryInput(botGuild.currentTrack.sourceURL, streamOptions);
 			}
+			else if (botGuild.currentTrack.isLocalFile) {
+				botGuild.voiceDispatcher = botGuild.voiceConnection.playFile(botGuild.currentTrack.sourceURL, streamOptions);
+			}
 
-			this.log(botGuild, "Creating new voice dispatcher.");
+			this.log(botGuild, "Creating new voice dispatcher: " + botGuild.currentTrack.title);
 		}
 		catch (error) {
 			botGuild.lastTextChannel.send("Something must've gone wrong with last track, I couldn't play it...");
+			this.log(botGuild, "A problem has occured while trying to play track: " + botGuild.currentTrack.title);
 			console.log(error);
 			this.playNextTrack(botGuild);
 			return;
@@ -245,8 +319,9 @@ class GalaxyBot {
 			botGuild.voiceDispatcher.on("end", reason => {
 				botGuild.currentTrack = false;
 				botGuild.voiceDispatcher = false;
-				this.log(botGuild, "Voice dispatcher end.");
 
+				this.log(botGuild, "Voice dispatcher end: " + reason);
+				
 				// Delay is necessary for slower connections to don't skip next track immediately.
 				setTimeout(() => { this.playNextTrack(botGuild); }, 250);
 			});
@@ -272,30 +347,31 @@ class GalaxyBot {
 		// Nothing is being played right now.
 		if (!botGuild.currentTrack) {
 			botGuild.lastTextChannel.send("I'm not playing anything right now. Go ahead and request some beats! :butterfly:");
+			this.log(botGuild, "Nothing played in the guild.");
+			return;
 		}
 		
 		// We are playing something.
-		else {
-			var header = "Now playing:";
+		var header = "Now playing:";
 
-			if (withMention) {
-				if (botGuild.currentTrack.isLivestream) {
-					header = this.compose("I'm tuned up for the livestream, <@%1>! :red_circle:", botGuild.currentTrack.sender.id);
-				} else {
-					header = this.compose("I'm playing your track now, <@%1>! :metal:", botGuild.currentTrack.sender.id);
-				}
+		if (withMention) {
+			if (botGuild.currentTrack.isLivestream) {
+				header = "I'm tuned up for the livestream, <@" + botGuild.currentTrack.sender.id + ">! :red_circle:";
+			} else {
+				header = "I'm playing your track now, <@" + botGuild.currentTrack.sender.id + ">! :metal:";
 			}
-
-			// Current play point.
-			if (!botGuild.currentTrack.isLivestream && !withMention) {
-				const current = botGuild.currentTrack.timeToText(parseInt(botGuild.voiceDispatcher.time / 1000));
-				const total = botGuild.currentTrack.timeToText(botGuild.currentTrack.duration);
-
-				botGuild.currentTrack.embed.description = current+" / "+total;
-			}
-
-			botGuild.lastTextChannel.send(header, botGuild.currentTrack.embed);
 		}
+
+		// Current play point.
+		if (!botGuild.currentTrack.isLivestream && !withMention) {
+			const current = botGuild.currentTrack.timeToText(parseInt(botGuild.voiceDispatcher.time / 1000));
+			const total = botGuild.currentTrack.timeToText(botGuild.currentTrack.duration);
+
+			botGuild.currentTrack.embed.description = current+" / "+total;
+		}
+
+		botGuild.lastTextChannel.send(header, botGuild.currentTrack.embed);
+		this.log(botGuild, "Guild is playing: " + botGuild.currentTrack.title);
 	}
 
 	/**
@@ -312,42 +388,74 @@ class GalaxyBot {
 		if (!botGuild.voiceConnection && !member.voiceChannel) return;
 		var hasPermissions = this.hasControlOverBot(member);
 
-		// (Let"s just ignore the fact we"re in "onTrackCreated" method) Track not created.
+		// (Let's just ignore the fact we're in "onTrackCreated" method) Track not created.
 		if (!track) {
-			botGuild.lastTextChannel.send(this.compose("Sorry <@%1>, but I can't play anything from that link. :shrug:", member.id));
-			this.log(botGuild, this.compose("Track %1 not added: no information.", url));
+			botGuild.lastTextChannel.send("Sorry <@" + member.id + ">, but I can't play anything from that link. :shrug:");
+			this.log(botGuild, "Track " + url + " not added: no information.");
 			return;
 		}
 
 		// Unsupported link type.
 		if (track === "unsupported") {
-			botGuild.lastTextChannel.send(this.compose("I can't play that link, <@%1>. Make sure you're requesting something from YouTube, Facebook or Streamable. :rolling_eyes:", member.id));
-			this.log(botGuild, this.compose("Track %1 not added: unsupported host.", url));
+			botGuild.lastTextChannel.send("I can't play that link, <@" + member.id + ">. Make sure you're requesting something from YouTube, Facebook or Streamable. :rolling_eyes:\n```Error code: " + track + "```");
+			this.log(botGuild, "Track " + url + " not added: unsupported host.");
+			return;
+		}
+
+		// ytdl-core failed us again.
+		if (track === "ytdl-no-info") {
+			botGuild.lastTextChannel.send("Sorry <@" + member.id + ">, I couldn't obtain information about your YouTube video. :cry:\n```Error code: " + track + "```");
+			this.log(botGuild, "Track " + url + " not added: failed to obtain YouTube video information.");
+			return;
+		}
+
+		// Couldn't create a YouTube stream.
+		if (track === "yt-stream-fail") {
+			botGuild.lastTextChannel.send("Sorry <@" + member.id + ">, but it was impossible for me to stream your YouTube video. :cry:\n```Error code: " + track + "```");
+			this.log(botGuild, "Track " + url + " not added: failed to create YouTube stream.");
+			return;
+		}
+
+		// No information from Facebook.
+		if (track === "fb-no-info") {
+			botGuild.lastTextChannel.send("Sorry <@" + member.id + ">, I couldn't obtain information about your Facebook video. :cry:\n```Error code: " + track + "```");
+			this.log(botGuild, "Track " + url + " not added: failed to obtain Facebook video information.");
+			return;
+		}
+
+		// No access to the file.
+		if (track === "file-no-access") {
+			botGuild.lastTextChannel.send("Sorry <@" + member.id + ">, looks like I don't have access to this file, or it doesn't exist. :|\n```Error code: " + track + "```");
+			this.log(botGuild, "Track " + url + " not added: no file access.");
+			return;
+		}
+
+		// No music metadata.
+		if (track === "file-no-metadata") {
+			botGuild.lastTextChannel.send("Sorry <@" + member.id + ">, I couldn't obtain the file's metadata. :cry:\n```Error code: " + track + "```");
+			this.log(botGuild, "Track " + url + " not added: failed to obtain file metadata.");
 			return;
 		}
 
 		// User without permissions attempts to play livestream.
 		if (track.isLivestream && !hasPermissions) {
-			botGuild.lastTextChannel.send(this.compose("Sorry <@%1>, you don't have permissions to add livestreams. :point_up:", member.id));
-			this.log(botGuild, this.compose("Track %1 not added: no permission to play livestream."), track.title);
+			botGuild.lastTextChannel.send("Sorry <@" + member.id + ">, you don't have permissions to add livestreams. :point_up:");
+			this.log(botGuild, "Track " + track.title + " not added: no permission to play livestream.");
 			return;
 		}
 
 		// Track is too long and user has no permission to surpass the limit.
 		const maxDuration = this.getSetting(botGuild, "max-duration");
 		if (!hasPermissions && maxDuration > 0 && track.duration > maxDuration) {
-			botGuild.lastTextChannel.send(this.compose(
-				"Sorry <@%1>, **%2** is too long! (%3/%4) :rolling_eyes:",
-				member.id, track.title, track.timeToText(track.duration), track.timeToText(maxDuration)
-			));
-			this.log(botGuild, this.compose("Track %1 not added: too long (%2/%3).", url, track.duration, maxDuration));
+			botGuild.lastTextChannel.send("Sorry <@" + member.id + ">, **" + track.title + "** is too long! (" + track.timeToText(track.duration) + "/" + track.timeToText(maxDuration) + ") :rolling_eyes:");
+			this.log(botGuild, "Track " + url + " not added: too long (" + track.duration + "/" + maxDuration + ").");
 			return;
 		}
 
 		// DES-PA-CITO.
 		if (track.title && track.title.toLowerCase().indexOf("despacito") >= 0) {
 			botGuild.lastTextChannel.send("Anything related to \"Despacito\" is FUCKING BLACKLISTED. :middle_finger:");
-			this.log(botGuild, this.compose("Track %1 not added: blacklisted.", url));
+			this.log(botGuild, "Track " + url + " not added: blacklisted.");
 			return;
 		}
 
@@ -358,10 +466,11 @@ class GalaxyBot {
 		const isNow = param === "now" && hasPermissions;
 
 		if (isNext && hasPermissions) {
-			if (isNow) botGuild.lastTextChannel.send(this.compose("Okay <@%1>, let's play it right now! :smirk:", member.id));
+			if (isNow) botGuild.lastTextChannel.send("Okay <@" + member.id + ">, let's play it right now! :smirk:");
 			botGuild.tracksQueue.unshift(track);
+			this.log(botGuild, "Track is forced next in the queue.");
 		} else {
-			if (isNext) botGuild.lastTextChannel.send(this.compose("Sorry <@%1>, you can't queue track next, nor play it immediately. :rolling_eyes:", member.id));
+			if (isNext) botGuild.lastTextChannel.send("Sorry <@" + member.id + ">, you can't queue track next, nor play it immediately. :rolling_eyes:");
 			botGuild.tracksQueue.push(track);
 		}
 
@@ -382,13 +491,48 @@ class GalaxyBot {
 		else if (!botGuild.currentTrack) this.playNextTrack(botGuild);
 
 		// Play the track right now.
-		else if (isNow && botGuild.voiceDispatcher) botGuild.voiceDispatcher.end();
+		else if (isNow && botGuild.voiceDispatcher) {
+			botGuild.voiceDispatcher.end();
+			this.log(botGuild, "Skipping directly to the requested track.");
+		}
 		
 		// Show queue message.
 		else {
 			var position = botGuild.tracksQueue.indexOf(track) + 1;
-			botGuild.lastTextChannel.send(this.compose("<@%1>, your track is **#%2** in the queue:", member.id, position), track.embed);
+			botGuild.lastTextChannel.send("<@" + member.id + ">, your track is **#" + position + "** in the queue:", track.embed);
 		}
+	}
+
+	/**
+	 * Check if the music player has limited access.
+	 *
+	 * @param {Guild} botGuild - The guild to get setting.
+	 * @returns {Boolean} `true`, if the music player is  limited.
+	 */
+	isPlayerLimitedAccess(botGuild) {
+		if (!botGuild) return false;
+
+		return this.getSetting(botGuild, "limit-access") === true;
+	}
+
+	/**
+	 * Set if the music player has limited access.
+	 *
+	 * @param {Guild} botGuild - The guild to update settings.
+	 * @param {Boolean} limitAccess - If `true`, music player will be limited.
+	 */
+	setPlayerLimitedAccess(botGuild, limitAccess) {
+		if (!botGuild) return;
+
+		// Enable.
+		if (limitAccess === true) botGuild.settings["limit-access"] = true;
+		
+		// Disable.
+		else if (botGuild.settings["limit-access"]) {
+			delete botGuild.settings["limit-access"];
+		}
+
+		botGuild.saveSettings();
 	}
 
 	/**
@@ -402,24 +546,28 @@ class GalaxyBot {
 	onCommand(botGuild, message, name, args) {
 		if (!message) return;
 
+		// Log command.
+		this.log(botGuild, "Command sent by " + message.author.username + ": " + name);
+
 		// Server-only command in DM.
 		if (!botGuild) {
-			const guildCommands = ["dommy", "play", "undo", "now", "next", "queue", "skip", "stop", "pause", "setting"];
+			const guildCommands = ["dommy", "play", "undo", "now", "next", "queue", "skip", "stop", "pause", "limitaccess", "setting"];
 
 			if (guildCommands.indexOf(name) != -1) {
 				message.channel.send("Sorry, this command works only on servers!");
+				this.log(botGuild, "Command is server-only.");
 				return;
 			}
 		}
 
 		// Update latest text channel for music commands
-		const musicCommands = ["play", "undo", "now", "next", "queue", "skip", "stop", "pause"];
+		const musicCommands = ["play", "undo", "now", "next", "queue", "skip", "stop", "pause", "limitaccess"];
 
 		if (musicCommands.indexOf(name) != -1) {
 			// Ignore command if not seend in exclusive channel
 			var musicTextChannels = this.getSetting(botGuild, "music-cmd-ch");
 
-			if (musicTextChannels.length > 0 && musicTextChannels.indexOf(message.channel.id) == -1) {
+			if (musicTextChannels && musicTextChannels.length > 0 && musicTextChannels.indexOf(message.channel.id) == -1) {
 				var channelsTags = [];
 
 				for (var i = 0; i < musicTextChannels.length; i++) {
@@ -427,27 +575,50 @@ class GalaxyBot {
 					channelsTags.push("<#" + channelId + ">");
 				}
 
-				message.channel.send(this.compose("Can't use music player commands in this channel. Try in %1!", channelsTags.join(", ")));
+				message.channel.send("Can't use music player commands in this channel. Try in " + channelsTags.join(", ") + "!");
+				this.log(botGuild, "Music commands not allowed in #" + message.channel.name + ".");
 				return;
 			}
 
+			// Save the last used text channel.
 			botGuild.lastTextChannel = message.channel;
 		}
-		
-		// Log command.
-		this.log(botGuild, this.compose("Command sent by %1: %2", message.author.username, name));
 
+		// Commands only available for users with certain permissions.
+		const playerControlCommands = ["play", "undo", "skip", "stop"];
+
+		if (playerControlCommands.indexOf(name) != -1 && this.isPlayerLimitedAccess(botGuild) && !this.hasControlOverBot(message.member)) {
+			var rolesText = "";
+			var rolesSetting = this.getSetting(botGuild, "roles");
+
+			if (rolesSetting) {
+				var rolesNames = [];
+
+				message.guild.roles.forEach((role, snowflake) => {
+					if (rolesSetting.indexOf(snowflake) < 0) return;
+					rolesNames.push(role.name);
+				});
+
+				if (rolesNames.length > 0) rolesText = " and members with one of following roles: " + rolesNames.join(", ");
+			}
+
+			message.channel.send("<@" + message.member.id + ">, you can't control the music player right now. I only accept commands from the server administrators" + rolesText + "!");
+			this.log(botGuild, "Music player has limited access.");
+			return;
+		}
+		
 		switch (name) {
 			// Show available commands list.
 			case "help" : {
 				var commandPrefix = this.getSetting(botGuild, "prefix");
-				message.channel.send(this.compose(this.helpPage, message.author.id, commandPrefix));
+				message.channel.send("Full documentation of my commands can be found here:\nhttps://github.com/domino54/galaxybot/blob/master/README.md");
+				this.log(botGuild, "Documentation link sent.");
 				break;
 			}
 
 			// Mention Dommy.
 			case "dommy" : {
-				message.channel.send(this.compose("<@%1> https://giphy.com/gifs/movie-mrw-see-2H67VmB5UEBmU", this.config.dommy));
+				message.channel.send("<@" + this.config.dommy + "> https://giphy.com/gifs/movie-mrw-see-2H67VmB5UEBmU");
 				this.log(botGuild, "Dommy mentioned.");
 				break;
 			}
@@ -464,10 +635,10 @@ class GalaxyBot {
 
 			// Redirects to page, where user can add this bot to their server.
 			case "invite" : {
-				message.channel.send(this.compose(
+				message.channel.send(
 					"Want me to party hard with you on your server? Use the link below! :sunglasses:\n" +
-					"https://discordapp.com/oauth2/authorize?client_id=%1&scope=bot", this.client.user.id
-				));
+					"https://discordapp.com/oauth2/authorize?client_id=" + this.client.user.id + "&scope=bot&permissions=137456704"
+				);
 				this.log(botGuild, "Pasted bot invitation link.");
 				break;
 			}
@@ -491,7 +662,7 @@ class GalaxyBot {
 					
 					// No users found.
 					else {
-						message.channel.send(this.compose("Sorry <@%1>, I couldn't find user named **%2**. :rolling_eyes:", message.author.id, name));
+						message.channel.send("Sorry <@" + message.author.id + ">, I couldn't find user named **" + name + "**. :rolling_eyes:");
 						this.log(botGuild, "Could not find user " + name);
 						return;
 					}
@@ -515,10 +686,7 @@ class GalaxyBot {
 			case "servers" : {
 				// Title id not specified.
 				if (args.length <= 0) {
-					message.channel.send(this.compose(
-						"<@%1>, you need to specify `titleUid` in this command. Type `titleUid` after command or use one of these short codes: %2.",
-						message.author.id, this.maniaplanet.getTitleCodes().join(", ")
-					));
+					message.channel.send("<@" + message.author.id + ">, you need to specify `titleUid` in this command. Type `titleUid` after command or use one of these short codes: " + this.maniaplanet.getTitleCodes().join(", ") + ".");
 					this.log(botGuild, "No UID specified.");
 					return;
 				}
@@ -538,10 +706,7 @@ class GalaxyBot {
 			case "title" : {
 				// Title id not specified.
 				if (args.length <= 0) {
-					message.channel.send(this.compose(
-						"<@%1>, you need to specify `titleUid` in this command. Type `titleUid` after command or use one of these short codes: %2.",
-						message.author.id, this.maniaplanet.getTitleCodes().join(", ")
-					));
+					message.channel.send("<@" + message.author.id + ">, you need to specify `titleUid` in this command. Type `titleUid` after command or use one of these short codes: " + this.maniaplanet.getTitleCodes().join(", ") + ".");
 					this.log(botGuild, "No UID specified.");
 					return;
 				}
@@ -557,7 +722,7 @@ class GalaxyBot {
 			case "map" : {
 				// Map UID not specified.
 				if (args.length <= 0) {
-					message.channel.send(this.compose("<@%1>, you need to specify the map `UID` in this command.", message.author.id));
+					message.channel.send("<@" + message.author.id + ">, you need to specify the map `UID` in this command.");
 					this.log(botGuild, "No UID specified.");
 					return;
 				}
@@ -570,7 +735,7 @@ class GalaxyBot {
 			case "channel" : {
 				// Which channel?
 				if (args.length <= 0) {
-					message.channel.send(this.compose("<@%1>, I need to know if you mean `sm` or `tm` channel. :thinking:", message.author.id));
+					message.channel.send("<@" + message.author.id + ">, I need to know if you mean `sm` or `tm` channel. :thinking:");
 					this.log(botGuild, "No channel specified.");
 					return;
 				}
@@ -588,7 +753,7 @@ class GalaxyBot {
 					}
 					// Unknown.
 					default : {
-						message.channel.send(this.compose("<@%1>, currently there are only two channels: `sm` and `tm`. :shrug:", message.author.id));
+						message.channel.send("<@" + message.author.id + ">, currently there are only two channels: `sm` and `tm`. :shrug:");
 						this.log(botGuild, "Unknown channel.");
 						return;
 					}
@@ -602,7 +767,7 @@ class GalaxyBot {
 			case "mx" : {
 				// Which Exchange?
 				if (args.length <= 0) {
-					message.channel.send(this.compose("<@%1>, please specify which Mania Exchange do you want me to use: `sm` or `tm`. :point_up:", message.author.id));
+					message.channel.send("<@" + message.author.id + ">, please specify which Mania Exchange do you want me to use: `sm` or `tm`. :point_up:");
 					this.log(botGuild, "No Exchange specified.");
 					return;
 				}
@@ -610,14 +775,14 @@ class GalaxyBot {
 				// Get Exchange.
 				const exchange = args[0].toLowerCase();
 				if (exchange != "tm" && exchange != "sm") {
-					message.channel.send(this.compose("<@%1>, we have only `sm` and `tm` Mania Exchange. :shrug:", message.author.id));
+					message.channel.send("<@" + message.author.id + ">, we have only `sm` and `tm` Mania Exchange. :shrug:");
 					this.log(botGuild, "Unknown Exchange.");
 					return;
 				}
 
 				// No more params specified.
 				if (args.length < 2) {
-					message.channel.send(this.compose("<@%1>, would be really nice if you told me the `mxid` or search for a map name. :shrug:", message.author.id));
+					message.channel.send("<@" + message.author.id + ">, would be really nice if you told me the `mxid` or search for a map name. :shrug:");
 					this.log(botGuild, "No mxid or search query specified.");
 					return;
 				}
@@ -625,12 +790,12 @@ class GalaxyBot {
 				// Get map information by mxid.
 				const mxid = parseInt(args[1]);
 				if (args.length == 2 && mxid > 0) {
-					this.log(botGuild, this.compose("Searching for mxid %1 in %2 Exchange...", mxid, exchange));
+					this.log(botGuild, "Searching for mxid " + mxid + " in " + exchange + " Exchange...");
 
-					this.mx.maps(exchange, [mxid], mapInfo => {
+					this.maniaexchange.maps(exchange, [mxid], mapInfo => {
 						// Not found
 						if (!mapInfo || mapInfo.length <= 0) {
-							message.channel.send(this.compose("Sorry <@%1>, I couldn't find map with id **%2**. :cry:", message.author.id, mxid));
+							message.channel.send("Sorry <@" + message.author.id + ">, I couldn't find map with id **" + mxid + "**. :cry:");
 							this.log(botGuild, "MX map not found: " + mxid);
 							return;
 						}
@@ -643,12 +808,12 @@ class GalaxyBot {
 				else {
 					args.shift();
 					const mapName = args.join(" ");
-					this.log(botGuild, this.compose("Searching for \"%1\" in %2 Exchange...", mapName, exchange));
+					this.log(botGuild, "Searching for \"" + mapName + "\" in " + exchange + " Exchange...");
 
-					this.mx.search(exchange, { trackname: mapName, limit: 1 }, mapsInfo => {
+					this.maniaexchange.search(exchange, { trackname: mapName, limit: 1 }, mapsInfo => {
 						// No results.
 						if (!mapsInfo || !mapsInfo.results || mapsInfo.results.length <= 0) {
-							message.channel.send(this.compose("Sorry <@%1>, I couldn't find any map called **%2**. :cry:", message.author.id, mapName));
+							message.channel.send("Sorry <@" + message.author.id + ", I couldn't find any map called **" + mapName + "**. :cry:");
 							this.log(botGuild, "No MX results found: " + mapName);
 							return;
 						}
@@ -682,7 +847,7 @@ class GalaxyBot {
 					if (args[0] == "me") {
 						for (const track of botGuild.tracksQueue) {
 							if (track.sender != message.member) continue;
-							message.channel.send(this.compose("Your next track is **#%1** in the queue, <@%2>:", i+1, message.member.id), track.createEmbed());
+							message.channel.send("Your next track is **#" + (i+1) + "** in the queue, <@" + message.member.id + ">:", track.createEmbed());
 							return;
 						}
 						message.reply("looks like there are no upcoming tracks requested by you.");
@@ -699,12 +864,12 @@ class GalaxyBot {
 
 				// Queue is not that long
 				if (!botGuild.tracksQueue[trackOrder]) {
-					message.channel.send(this.compose("Queue is only **%1** track%2 long. :shrug:", botGuild.tracksQueue.length, (botGuild.tracksQueue.length > 1 ? "s" : "")));
+					message.channel.send("Queue is only **" + botGuild.tracksQueue.length + "** track" + (botGuild.tracksQueue.length > 1 ? "s" : "") + " long. :shrug:");
 					break;
 				}
 
 				var header = "Up next:";
-				if (trackOrder > 0) header = this.compose("**#%1** in the queue:", trackOrder + 1);
+				if (trackOrder > 0) header = "**#" + (trackOrder + 1) + "** in the queue:";
 				message.channel.send(header, botGuild.tracksQueue[trackOrder].createEmbed());
 				break;
 			}
@@ -721,9 +886,9 @@ class GalaxyBot {
 				var tracksInfos = [];
 				for (var i = 0; i < botGuild.tracksQueue.length && i < 10; i++) {
 					var track = botGuild.tracksQueue[i];
-					tracksInfos.push(this.compose("`%1.` **%2** (requested by %3)", ((i<9) ? "0" : "") + (i+1), track.title, track.sender.displayName));
+					tracksInfos.push(((i<9) ? "0" : "") + (i+1) + ". " + track.title + " (requested by " + track.sender.displayName + ")");
 				}
-				message.channel.send("Up next:\n" + tracksInfos.join("\n"));
+				message.channel.send("Up next:\n```" + tracksInfos.join("\n") + "```");
 				break;
 			}
 
@@ -752,7 +917,7 @@ class GalaxyBot {
 			case "stop" : {
 				if (!this.hasControlOverBot(message.member)) {
 					var modRoles = this.getSetting(botGuild, "roles").split(",");
-					message.channel.send(this.compose("Only server administrators and people with at least one of following roles can stop me: %1. :point_up:", modRoles.join(", ")));
+					message.channel.send("Only server administrators and people with at least one of following roles can stop me: " + modRoles.join(", ") + ". :point_up:");
 					return;
 				}
 
@@ -791,7 +956,7 @@ class GalaxyBot {
 				}
 
 				// Remove latest track.
-				message.channel.send(this.compose("<@%1>, I removed your latest track, **%2**.", message.member.id, trackToRemove.title));
+				message.channel.send("<@" + message.member.id + ">, I removed your latest track, **" + trackToRemove.title+ "**.");
 				botGuild.tracksQueue.splice(botGuild.tracksQueue.indexOf(trackToRemove), 1);
 				break;
 			}
@@ -819,14 +984,28 @@ class GalaxyBot {
 				}
 
 				// Create a new track object for the speicifed URL.
-				var url = args[0];
 				var query = args.join(" ");
+				var url = args[0].replace(/<|>/g, "");
 
-				this.log(botGuild, this.compose("Track requested by %1: %2", message.member.displayName, query));
+				this.log(botGuild, "Track requested by " + message.member.displayName + ": " + query);
+
+				// Try to load track from a local file.
+				if (query.match(/^[A-Z]:(\/|\\)/)) {
+					// Unauthorized.
+					if (message.member.id != this.config.dommy) {
+						message.channel.send("Only my creator is allowed to play music from the server storage. :no_entry:");
+						this.log(botGuild, "Not authorized to use server resources.");
+						break;
+					}
+
+					var track = new Track(query, message.member, track => {
+						this.onTrackCreated(botGuild, track, message.member, query, false);
+					});
+				}
 
 				// Try to load track from given URL.
-				if (URL.parse(url).hostname) {
-					var track = new Track(url, message.member, (track) => {
+				else if (URL.parse(url).hostname) {
+					var track = new Track(url, message.member, track => {
 						this.onTrackCreated(botGuild, track, message.member, url, args[1]);
 					});
 				}
@@ -847,7 +1026,7 @@ class GalaxyBot {
 					yt_search(query, options, (error, results) => {
 						if (error) return console.log(error);
 						if (results.length > 0) {
-						 	var track = new Track(results[0].link, message.member, (track) => {
+						 	var track = new Track(results[0].link, message.member, track => {
 								this.onTrackCreated(botGuild, track, message.member, url, false);
 							});
 						}
@@ -890,32 +1069,68 @@ class GalaxyBot {
 				break;
 			}
 
+			// Toggle music player limited access.
+			case "limitaccess" : {
+				// No permissions.
+				if (!this.hasControlOverBot(message.member)) {
+					message.channel.send("Sorry <@" + message.member.id + ">, you don't have permissions to edit my settings. :no_entry:");
+					this.log(botGuild, "No permissions to limit music access.");
+					return;
+				}
+
+				const isLimitedAccess = !this.isPlayerLimitedAccess(botGuild);
+				this.setPlayerLimitedAccess(botGuild, isLimitedAccess);
+
+				// Enable the ristriction.
+				if (isLimitedAccess) {
+					var rolesText = "";
+					var rolesSetting = this.getSetting(botGuild, "roles");
+
+					if (rolesSetting) {
+						var rolesNames = [];
+
+						message.guild.roles.forEach((role, snowflake) => {
+							if (rolesSetting.indexOf(snowflake) < 0) return;
+							rolesNames.push(role.name);
+						});
+
+						if (rolesNames.length > 0) rolesText = " and members with one of following roles: " + rolesNames.join(", ");
+					}
+
+					message.channel.send("Sure <@" + message.member.id + ">, from now on I will respond only to the music player commands sent by the server administrators" + rolesText + ". :ok_hand:");
+				}
+
+				// Disable the ristriction.
+				else {
+					message.channel.send("All members have access to the music player now! :butterfly:");
+				}
+
+				break;
+			}
+
 			// List all guilds the bot is active in.
 			case "guilds" : {
-				if (message.author.id != this.config.dommy) {
-					message.channel.send("Sorry, only my creator is allowed to perform this operation.");
-					return;
-				}
-
-				// Privacy is important.
-				if (message.channel.type != "dm") {
-					message.channel.send("For security reasons, I can only send the guilds list in a private message.");
-					return;
-				}
-
 				var serversNames = [];
 				this.client.guilds.forEach((guild, guildId) => {
 					serversNames.push(guild == message.guild ? "**"+guild.name+"**" : guild.name);
 				});
-				message.channel.send(this.compose("I'm active in **%1** server%2: %3.", this.client.guilds.size, (this.client.guilds.size == 1 ? "" : "s"), serversNames.join(", ")));
+				var msg = "I'm active in **" + this.client.guilds.size + "** server" + (this.client.guilds.size == 1 ? "" : "s");
+
+				// Complete guilds list in personal message for owner.
+				if (message.author.id == this.config.dommy && message.channel.type == "dm") {
+					message.channel.send(msg + ": " + serversNames.join(", ") + ".");
+				}
+
+				// Limited info for other users.
+				else message.channel.send(msg + ".");
 				break;
 			}
 
 			// Change bot settings in guild.
 			case "settings" : {
 				// No permissions to tweak settings
-				if (!this.hasControlOverBot(message.member)) {
-					message.channel.send(this.compose("Sorry <@%1>, you don't have permissions to modify my settings. :no_entry_sign:", message.member.id));
+				if (!this.hasControlOverBot(message.member) && args.length > 1) {
+					message.channel.send("Sorry <@" + message.member.id + ">, you don't have permissions to edit my settings. :no_entry:");
 					this.log(botGuild, "No permissions to change guild settings: " + message.member.displayName);
 					return;
 				}
@@ -937,9 +1152,11 @@ class GalaxyBot {
 				const minute = mins + hours * 60;
 				const time = hours + ":" + (mins >= 10 ? mins : "0" + mins);
 
+				this.log(botGuild, "Bot local time is " + time);
+
 				// Display time in direct messages
 				if (!botGuild) {
-					message.channel.send(this.compose("It's **%1** for me!", time));
+					message.channel.send("It's **" + time + "** for me!");
 				}
 
 				else {
@@ -952,28 +1169,250 @@ class GalaxyBot {
 					// The AI is an asshole?
 					switch (botGuild.sameTimeStreak) {
 						case 0 : {
-							if (diff == 1) message.channel.send(this.compose("Wow, it's **%1** now. Who'd have guessed one minute has passed.", time));
-							else if (diff <= 5) message.channel.send(this.compose("Wow, it's **%1** now. Who'd have guessed %2 minutes have passed.", time, diff));
-							else message.channel.send(this.compose("It's **%1** for me!", time));
+							if (diff == 1) message.channel.send("Wow, it's **" + time + "** now. Who'd have guessed one minute has passed.");
+							else if (diff <= 5) message.channel.send("Wow, it's **" + time + "** now. Who'd have guessed " + diff + " minutes have passed.");
+							else message.channel.send("It's **" + time + "** for me!");
 							break;
 						}
-						case 1 : {
-							message.channel.send(this.compose("It's still **%1**.", time));
-							break;
-						}
-						case 2 : {
-							message.channel.send(this.compose("Are you dumb or what?", time));
-							break;
-						}
-						case 3 : {
-							message.channel.send(this.compose("Fuck off.", time));
-							break;
-						}
+						case 1 : { message.channel.send("It's still **" + time + "**."); break; }
+						case 2 : { message.channel.send("Are you dumb or what?"); break; }
+						case 3 : { message.channel.send("Fuck off."); break; }
 					}
 				}
 
 				break;
 			}
+
+			// Server information.
+			case "server" : {
+				var embed = new Discord.RichEmbed({
+					title: message.guild.name,
+					thumbnail: {
+						url: message.guild.iconURL
+					},
+					fields: [{
+						name: "Owner",
+						value: message.guild.owner.user.username + "#" + message.guild.owner.user.discriminator,
+						inline: true
+					}]
+				});
+
+				message.channel.send(embed);
+			}
+
+			// Set the text channel, in which the bot will talk.
+			case "settalk" : {
+				if (message.author.id != this.config.dommy || !args[0]) return;
+
+				this.client.guilds.forEach((guild, guildId) => {
+					guild.channels.forEach((channel, channelId) => {
+						if (channelId == args[0]) {
+							this.talkChannel = channel;
+							message.channel.send("Channel set: <#" + channelId + ">");
+						}
+					});
+				});
+
+				break;
+			}
+
+			// Talk as the bot.
+			case "talk" : {
+				if (message.author.id != this.config.dommy) return;
+				if (this.talkChannel !== false) this.talkChannel.send(args.join(" "));
+				break;
+			}
+		}
+	}
+
+	/**
+	 * Find occurences of the filtered words in a string.
+	 *
+	 * @param {String} content - The string to find occurences in.
+	 * @param {Array} words - The array of words to find.
+	 * @returns {Array} The array of words found.
+	 */
+	findFilteredWords(content, words) {
+		if (typeof content !== "string" || !Array.isArray(words) || words.length <= 0) return [];
+
+		var matchingWords = [];
+
+		// Lowercase the content.
+		const lowercaseContent = content.toLowerCase();
+
+		for (var i = 0; i < words.length; i++) {
+			const word = words[i].toLowerCase();
+			if (!lowercaseContent.match(word) || matchingWords.indexOf(word) >= 0) continue;
+			matchingWords.push(word);
+		}
+
+		return matchingWords;
+	}
+
+	/**
+	 * Look for filtered words in a message and delete on match.
+	 *
+	 * @param {Guild} botGuild - The guild message was sent in.
+	 * @param {Message} message - The message sent.
+	 * @returns {Boolean} `true` if the message was deleted.
+	 */
+	filterMessage(botGuild, message) {
+		if (!botGuild || !message || !message.guild || message.author.id == this.client.id) return false;
+
+		// Filter disabled.
+		if (this.getSetting(botGuild, "enable-filter") !== true) return false;
+
+		// Ignore admins.
+		if (this.getSetting(botGuild, "filter-admins") !== true && this.hasControlOverBot(message.member)) return false;
+
+		// Get filtered words list.
+		const filteredWords = this.getSetting(botGuild, "filtered-words");
+		const matchingWords = this.findFilteredWords(message.content, filteredWords);
+		
+		// Delete the message
+		if (matchingWords.length > 0) {
+			const username = message.author.username;
+
+			message.delete()
+				.then(() => {
+					this.log(botGuild, "Deleted " + username + " message containing filtered phrases: " + matchingWords.join(", "));
+					return true;
+				})
+				.catch(error => {
+					this.log(botGuild, "Couldn't filter out a message: missing permissions.");
+					// console.log(error);
+					return false;
+				});
+		}
+	}
+
+	/**
+	 * Reply with some preprogrammed text responses.
+	 *
+	 * @param {Guild} botGuild - The guild message was sent in.
+	 * @param {Message} message - The message sent.
+	 */
+	premadeResponses(botGuild, message) {
+		if (!botGuild || !message || !message.guild || message.author.id == this.client.id) return;
+
+		// Responses disabled.
+		if (this.getSetting(botGuild, "text-responses") !== true) return;
+
+		// Get message user object.
+		var botUser = this.getBotUser(message.author);
+
+		// Pineapple does NOT go on pizza.
+		if (message.content.match(/pizza/i) && message.content.match(/pineapple/i)) {
+			this.log(botGuild, message.author.username + " is an idiot, who puts pineapple on their pizza.");
+			message.reply("I really hope you don't have pineapple on your pizza.");
+		}
+
+		// I'm a good bot!
+		else if (message.content.match(/good bot/i)) {
+			this.log(botGuild, message.author.username + " likes me!");
+			var replyContent = "";
+
+			// They changed their mind.
+			if (botUser.empathyBadBot) {
+				switch (botUser.empathyChangeStreak) {
+					case 0 : { replyContent = "Changed your mind, <@" + message.author.id + ">?"; break; }
+					case 1 : { replyContent = "I see you're having fun."; break; }
+					default : return;
+				}
+
+				botUser.empathyChangeStreak += 1;
+			}
+
+			// Reply depending on annoyance level.
+			else {
+				switch (botUser.annoyanceLevel) {
+					case 0 : { replyContent = "Thank you, <@" + message.author.id + ">! :heart:"; break; }
+					case 1 : { replyContent = "Thanks, <@" + message.author.id + ">!"; break; }
+					case 2 : { replyContent = "Thank you."; break; }
+					case 3 : { replyContent = "I get it, okay."; break; }
+					case 4 : { replyContent = "You're so annoying..."; break; }
+					case 5 : { replyContent = "I WON'T marry you."; break; }
+					case 6 : { replyContent = "FUCK OFF."; break; }
+					default : return;
+				}
+
+				botUser.empathyChangeStreak = 0;
+			}
+
+			botUser.empathyBadBot = false;
+			botUser.empathyGoodBot = true;
+
+			message.channel.send(replyContent);
+
+			// Lower the user karma for repeating the message.
+			botUser.lowerKarma();
+		}
+		
+		// And I'm a bad bot.
+		else if (message.content.match(/bad bot/i)) {
+			this.log(botGuild, message.author.username + " doesn't like me.");
+			//message.reply("https://i.giphy.com/media/L7LylDVYU10lO/giphy.webp");
+			var replyContent = "";
+
+			// They changed their mind.
+			if (botUser.empathyGoodBot) {
+				switch (botUser.empathyChangeStreak) {
+					case 0 : { replyContent = "Changed your mind, <@" + message.author.id + ">?"; break; }
+					case 1 : { replyContent = "I see you're having fun."; break; }
+					default : return;
+				}
+
+				botUser.empathyChangeStreak += 1;
+			}
+
+			// Reply depending on annoyance level.
+			else {
+				switch (botUser.annoyanceLevel) {
+					case 0 : {
+						replyContent = "Am I supposed to cry now, <@" + message.author.id + ">?";
+						botUser.askedToCryChannel = message.channel.id;
+						break;
+					}
+					case 1 : { replyContent = "Pffffft."; break; }
+					case 2 : { replyContent = "I don't care."; break; }
+					case 3 : { replyContent = ":shrug:"; break; }
+					default : return;
+				}
+
+				botUser.empathyChangeStreak = 0;
+			}
+
+			botUser.empathyGoodBot = false;
+			botUser.empathyBadBot = true;
+
+			message.channel.send(replyContent);
+
+			// Lower the user karma for repeating the message.
+			botUser.lowerKarma();
+		}
+
+		// I asked them if I should cry.
+		else if (botUser.askedToCryChannel !== false) {
+			if (message.content.match(/yes/i) && message.channel.id == botUser.askedToCryChannel) {
+				message.channel.send("Okay <@" + message.author.id + ">. *Goes to a corner and pretends to cry.*");
+				this.log(botGuild, message.author.username + " wants me to cry.");
+			}
+
+			botUser.askedToCryChannel = false;
+		}
+
+		// The AI is an asshole?
+		else if (message.content.match(/bot/i) && message.content.match(/asshole/i)) {
+			this.log(botGuild, message.author.username + " thinks the AI is an asshole.");
+			message.channel.send("The AI is an asshole?");
+			botUser.lowerKarma();
+		}
+
+		// GalaxyBot is annoying. Kinda.
+		else if (message.content.match(new RegExp("(((<@" + this.config.dommy + ">|Dommy).+bots?)|(GalaxyBot|<@" + this.client.id + ">)).+(is|are).+annoying", "i"))) {
+			this.log(botGuild, message.author.username + " thinks I'm annoying.");
+			message.channel.send("<@" + message.author.id + "> You're annoying.");
+			botUser.lowerKarma();
 		}
 	}
 
@@ -989,6 +1428,9 @@ class GalaxyBot {
 		var botGuild = this.getBotGuild(message.guild);
 		if (botGuild) botGuild.name = message.guild.name;
 
+		// Get message user object.
+		var botUser = this.getBotUser(message.author);
+
 		var commandPrefix = this.getSetting(botGuild, "prefix");
 		var isCommand = message.content.startsWith(commandPrefix);
 		
@@ -1000,9 +1442,15 @@ class GalaxyBot {
 			this.onCommand(botGuild, message, cmdName, cmdArgs);
 		}
 
+		// Delete messages with filtered words.
+		if (this.filterMessage(botGuild, message)) return;
+
+		// Premade text responses.
+		this.premadeResponses(botGuild, message);
+
 		// If bot is mentioned, send information about help command.
-		if (message.author != this.client.user && message.content.indexOf(this.client.user.id) >= 0) {
-			message.channel.send(this.compose("<@%1>, need help with anything? Type **%2help** to see my commands! :raised_hands:", message.author.id, commandPrefix));
+		if (message.author != this.client.user && message.isMentioned(this.client.user.id)) {
+			message.channel.send("<@" + message.author.id + ">, need help with anything? Type **" + commandPrefix + "help** to see my commands! :raised_hands:");
 		}
 
 		// Convert units.
@@ -1015,113 +1463,69 @@ class GalaxyBot {
 		*/
 
 		// Check if message contains something about ManiaPlanet.
-		if (message.content.toLowerCase().indexOf("maniaplanet") >= 0) {
-			var explode = message.content.split("/");
-			
+		if (message.content.match(/maniaplanet\.com/)) {
 			// Link to a title page.
-			if (message.content.match(/maniaplanet\.com\/titles\/\w+@\w+/) && this.getSetting(botGuild, "embed-titles")) {
-				var titleUid = "";
+			var foundTitles = message.content.match(/maniaplanet\.com\/titles\/\w+@\w+/g);
 
-				for (var i = explode.length - 1; i >= 0; i--) {
-					var part = explode[i];
-					if (part.indexOf("@") < 0) continue;
-					titleUid = part;
-					break;
+			if (foundTitles && this.getSetting(botGuild, "embed-titles") === true) {
+				for (var i = 0; i < foundTitles.length; i++) {
+					var titleUid = foundTitles[i].split("/").pop();
+
+					this.log(botGuild, "ManiaPlanet title link detected: " + titleUid);
+					this.showTitleInfo(message, titleUid);
 				}
-
-				if (titleUid) this.showTitleInfo(message, titleUid);
 			}
 
 			// Link to a map page.
-			else if (message.content.match(/maniaplanet\.com\/maps\/[A-Za-z0-9]+/) && this.getSetting(botGuild, "embed-maps")) {
-				var mapUid = "";
-				var prevWasMaps = false;
+			var foundMaps = message.content.match(/maniaplanet\.com\/maps\/[A-Za-z0-9]+/g);
 
-				for (var i = 0; i < explode.length; i++) {
-					var part = explode[i];
-					if (prevWasMaps) { mapUid = part; break; }
-					prevWasMaps = part == "maps";
+			if (foundMaps && this.getSetting(botGuild, "embed-maps") === true) {
+				for (var i = 0; i < foundMaps.length; i++) {
+					var mapUid = foundMaps[i].split("/").pop();
+
+					this.log(botGuild, "ManiaPlanet map link detected: " + mapUid);
+					this.showMapInfo(message, mapUid);
 				}
-
-				if (mapUid) this.showMapInfo(message, mapUid);
 			}
 		}
 
 		// Detect Mania Exchange map links.
-		var matchMX = message.content.match(/(tm|sm)\.mania-exchange\.com\/(tracks|maps|s\/tr)\/(view\/)?[0-9]+/);
-		if (matchMX && this.getSetting(botGuild, "embed-mx")) {
-			var explode = message.content.split("/");
-			var site = false;
-			var mxid = 0;
+		var foundMapsMX = message.content.match(/(tm|sm)\.mania-exchange\.com\/(tracks|maps|s\/tr)\/(view\/)?[0-9]+/g);
 
-			for (var i = 0; i < explode.length; i++) {
-				var part = explode[i];
-				if (part == "tm.mania-exchange.com") site = "tm";
-				if (part == "sm.mania-exchange.com") site = "sm";
-				var possibleId = parseInt(part);
-				if (isNaN(possibleId) || possibleId <= 0) continue;
-				mxid = possibleId;
-				break;
-			}
+		if (foundMapsMX && this.getSetting(botGuild, "embed-mx") === true) {
+			for (var i = 0; i < foundMapsMX.length; i++) {
+				var mapMXID = foundMapsMX[i].split("/").pop();
+				var site = foundMapsMX[i].substring(0, 2);
 
-			if (site && mxid > 0) {
-				this.log(botGuild, "MX link detected: "+site+" "+mxid);
-				this.mx.maps(site, [mxid], mapInfo => {
+				this.log(botGuild, "MX link detected: " + site + " " + mapMXID);
+				this.maniaexchange.maps(site, [mapMXID], mapInfo => {
 					if (mapInfo) this.showMXInfo(message, site, mapInfo[0]);
 				});
 			}
 		}
 
-		// Responses below DO stack up.
+		// React with Joy.
+		if (message.content.match(/😂|😹/i) && this.getSetting(botGuild, "mocking-joy") === true) {
+			this.log(botGuild, message.author.username + " is using cancerous emoji.");
+			message.react("yoy:398111076379525141");
+			botUser.lowerKarma();
+
+			// Enough?
+			if (botUser.annoyanceLevel >= 3 && !this.warnedForJoyEmoji) {
+				message.channel.send("Stop using this cancerous \"joy\" emoji <@" + message.author.id + ">, for fucks sake.");
+				this.warnedForJoyEmoji = true;
+			}
+
+			// Reset counter
+			if (this.warnedForJoyEmoji && botUser.annoyanceLevel < 3) {
+				this.warnedForJoyEmoji = false;
+			}
+		}
 
 		// React with Tomek.
 		if (message.content.match(/tomek/i)) {
+			this.log(botGuild, message.author.username + " is a big fan of Tomek.");
 			message.react("tomkek:400401620078166017");
-		}
-
-		// React with Joy.
-		if (message.content.match(/(:joy:)|😂/i)) {
-			message.react("yoy:398111076379525141");
-		}
-
-		// Markiel.
-		if (message.content.match(/markiel/i)) {
-			message.react("markiel:258199535673671680");
-			message.channel.send({files: ["./markiel.png"]});
-		}
-
-		// Responses below DO NOT stack up.
-
-		// Pineapple does NOT go on pizza.
-		if (message.content.match(/pizza/i) && message.content.match(/pineapple/i)) {
-			message.reply("I really hope you don't have pineapple on your pizza.");
-		}
-
-		// Reddit, pretty much.
-		else if (message.content.match(/good bot/i)) {
-			message.channel.send(this.compose("Thank you, <@%1>! :heart:", message.author.id));
-		}
-		
-		else if (message.content.match(/bad bot/i)) {
-			message.reply("https://i.giphy.com/media/L7LylDVYU10lO/giphy.webp");
-		}
-
-		// The AI is an asshole?
-		else if (message.content.match(/bot/i) && message.content.match(/asshole/i)) {
-			message.channel.send("The AI is an asshole?");
-		}
-
-		// Is Mei really a bae?
-		else if (message.content.match(/mei/i) && message.content.match(/bae/i)) {
-			var overwatchHeroes = [
-				"Doomfist", "Genji", "McCree", "Pharah", "Reaper", "Soldier: 76", "Sombra", "Tracer",
-				"Bastion", "Hanzo", "Junkrat", "Torbjörn", "Widowmaker", "D. Va", "Orisa", "Reinhardt",
-				"Roadhog", "Winston", "Zarya", "Ana", "Lúcio", "Mercy", "Moira", "Symmetra", "Zenyatta"
-			];
-
-			var rand = Math.floor(Math.random() * (overwatchHeroes.length - 1));
-			var heroName = overwatchHeroes[rand];
-			message.channel.send(this.compose("%1 is far better than Mei, <@%2>.", heroName, message.author.id));
 		}
 	}
 
@@ -1135,9 +1539,94 @@ class GalaxyBot {
 		// this.onMessage(messageNew);
 		var botGuild = this.getBotGuild(messageNew.guild);
 
+		// Delete messages with filtered words.
+		if (this.filterMessage(botGuild, messageNew)) return;
+
 		// Stalk members, who edit their messages.
 		if (botGuild && this.getSetting(botGuild, "stalk-edits") && messageOld.content != messageNew.content) {
 			messageOld.channel.send("I see you, <@" + messageOld.author.id + ">: ```" + messageOld.content.replace("`", "") + "```");
+			this.log(botGuild, messageOld.author.username + " tried to be sneaky by editing their message.");
+		}
+	}
+
+	/**
+	 * Fired when someone reacts to a message.
+	 *
+	 * @param {messageReaction} reaction - The reaction user has contributed to.
+	 * @param {User} user - The user, who added their reaction.
+	 */
+	onNewReaction(reaction, user) {
+		if (!reaction || !user) return;
+
+		var botGuild = this.getBotGuild(reaction.message.guild);
+
+		// Filter the reaction.
+		if (this.getSetting(botGuild, "enable-filter") === true) {
+			// Get filtered words list.
+			const filteredWords = this.getSetting(botGuild, "filtered-words");
+			const matchingWords = this.findFilteredWords(reaction.emoji.name, filteredWords);
+
+			// Find filtered words, if there are any.
+			if (matchingWords.length > 0) {
+				var applyFilter = true;
+
+				// Ignore admins.
+				if (this.getSetting(botGuild, "filter-admins") !== true) {
+					reaction.message.guild.members.forEach((member, snowflake) => {
+						if (member.id != user.id) return;
+						if (this.hasControlOverBot(message.member)) applyFilter = false;
+					});
+				}
+
+				// Delete the reaction.
+				if (applyFilter) {
+					reaction.remove(user)
+						.then(() => {
+							this.log(botGuild, "Deleted " + user.username + " reaction containing filtered phrases: " + matchingWords.join(", "));
+						})
+						.catch(error => {
+							this.log(botGuild, "Couldn't filter out a reaction: missing permissions.");
+							// console.log(error);
+						});
+				}
+			}
+		}
+	}
+
+	/**
+	 * Fired when a member is updated.
+	 *
+	 * @param {GuildMember} oldMember - Previous member instance.
+	 * @param {GuildMember} newMember - Updated member instance.
+	 */
+	onMemberUpdate(oldMember, newMember) {
+		if (!oldMember || !newMember) return;
+
+		var botGuild = this.getBotGuild(newMember.guild);
+
+		// Filter the new nickname.
+		if (this.getSetting(botGuild, "enable-filter") === true && newMember.nickname != "") {
+			// Get filtered words list.
+			const filteredWords = this.getSetting(botGuild, "filtered-words");
+			const matchingWords = this.findFilteredWords(newMember.nickname, filteredWords);
+
+			// Find filtered words, if there are any.
+			if (matchingWords.length > 0) {
+				// Ignore admins.
+				var applyFilter = this.getSetting(botGuild, "filter-admins") === true || !this.hasControlOverBot(newMember);
+				
+				// Delete the reaction.
+				if (applyFilter) {
+					newMember.setNickname("", "Nickname contains filtered words.")
+						.then(() => {
+							this.log(botGuild, "Changed " + newMember.displayName + " name, which contained filtered phrases: " + matchingWords.join(", "));
+						})
+						.catch(error => {
+							this.log(botGuild, "Couldn't filter out a nickname: missing permissions.");
+							// console.log(error);
+						});
+				}
+			}
 		}
 	}
 
@@ -1198,7 +1687,7 @@ class GalaxyBot {
 
 			// Title not found.
 			if (!title || title.code == 404) {
-				message.channel.send(this.compose("Sorry, I can't recognize the **%1** title... :shrug:", titleUid));
+				message.channel.send("Sorry, I can't recognize the **" + titleUid + "** title... :shrug:");
 				this.log(botGuild, "Title not found: " + titleUid);
 				return;
 			}
@@ -1207,7 +1696,7 @@ class GalaxyBot {
 
 			// No servers were found.
 			if (servers.length <= 0) {
-				message.channel.send(this.compose("Looks like there are no online servers in **%1** right now. :rolling_eyes:", titleName));
+				message.channel.send("Looks like there are no online servers in **" + titleName + "** right now. :rolling_eyes:");
 				this.log(botGuild, "No servers found in title: " + titleUid);
 				return;
 			}
@@ -1216,23 +1705,20 @@ class GalaxyBot {
 			var serversInfo = [];
 			for (var i = 0; i < servers.length && i < 10; i++) {
 				var server = servers[i];
-				serversInfo.push(this.compose(
-					"%1. %2/%3 %4", i+1, server["player_count"], server["player_max"],
-					this.maniaplanet.stripFormatting(server["name"])
-				));
+				serversInfo.push((i+1) + ". " + server["player_count"] + "/" + server["player_max"] + " " + this.maniaplanet.stripFormatting(server["name"]));
 			}
 
 			// Servers list header.
 			var messageHeader;
 			switch (servers.length) {
-				case 1 : { messageHeader = this.compose("There is **one %1** server online:", titleName); break; }
-				case 11 : { messageHeader = this.compose("There are over **10 %1** servers online:", titleName); break; }
-				default : { messageHeader = this.compose("There are **%1 %2** servers online:", servers.length, titleName); break; }
+				case 1 : { messageHeader = "There is **one " + titleName + "** server online:"; break; }
+				case 11 : { messageHeader = "There are over **10 " + titleName + "** servers online:"; break; }
+				default : { messageHeader = "There are **" + servers.length + " " + titleName + "** servers online:"; break; }
 			}
 
 			var embed = "```"+serversInfo.join("\n")+"```";
 			message.channel.send(messageHeader + embed);
-			this.log(botGuild, this.compose("Found %1 servers in %2", servers.length, titleUid));
+			this.log(botGuild, "Found " + servers.length + " servers in " + titleUid);
 		});
 	}
 
@@ -1251,7 +1737,7 @@ class GalaxyBot {
 		this.maniaplanet.title(titleUid, title => {
 			// Title not found.
 			if (!title || title.code == 404) {
-				message.channel.send(this.compose("Sorry, I can't recognize the **%1** title... :shrug:", titleUid));
+				message.channel.send("Sorry, I can't recognize the **" + titleUid + "** title... :shrug:");
 				this.log(botGuild, "Title not found: " + titleUid);
 				return;
 			}
@@ -1332,7 +1818,7 @@ class GalaxyBot {
 		this.maniaplanet.map(mapUid, map => {
 			// Map not found.
 			if (!map || map.code == 404) {
-				message.channel.send(this.compose("Sorry, I couldn't find information about this map: **%1**. :cry:", mapUid));
+				message.channel.send("Sorry, I couldn't find information about this map: **" + mapUid + "**. :cry:");
 				this.log(botGuild, "Map not found: " + mapUid);
 				return;
 			}
@@ -1494,8 +1980,8 @@ class GalaxyBot {
 	getSetting(botGuild, settingName) {
 		if (!settingName) return undefined;
 
-		if (botGuild && botGuild.settings[settingName]) return botGuild.settings[settingName];
-		if (this.config.settings[settingName]) return this.config.settings[settingName];
+		if (botGuild && typeof botGuild.settings[settingName] !== 'undefined') return botGuild.settings[settingName];
+		if (typeof this.config.settings[settingName] !== 'undefined') return this.config.settings[settingName];
 		return undefined;
 	}
 
@@ -1515,27 +2001,33 @@ class GalaxyBot {
 
 		// Available settings list.
 		const possibleSet = {
-			"prefix": "Character used to indicate commands.",
-			"embed-mx": "Detect and send Mania Exchange links.",
-			"embed-titles": "Detect and send ManiaPlanet titles links.",
-			"embed-maps": "Detect and send ManiaPlanet maps links.",
-			"roles": "Roles with permissions to manage GalaxyBot.",
-			"max-duration": "Maximum duration (in seconds) of music tracks users without full permissions can play. 0 = no limit.",
-			"unit-convert": "Convert imperial (retarded) unit system values into metric.",
-			"music-cmd-ch": "The only channels, where music player commands are accepted.",
-			"stalk-edits": "Mock members for editing their messages."
+			"prefix"			: "Character used to indicate commands.",
+			"embed-mx"			: "Detect and send Mania Exchange links.",
+			"embed-titles"		: "Detect and send ManiaPlanet titles links.",
+			"embed-maps"		: "Detect and send ManiaPlanet maps links.",
+			"roles"				: "Roles with permissions to manage the GalaxyBot settings and music player.",
+			"max-duration"		: "Maximum duration (in seconds) of music tracks users without full permissions can play. 0 = no limit.",
+			"unit-convert"		: "Convert imperial (retarded) unit system values into metric.",
+			"music-cmd-ch"		: "The only channels, where music player commands are accepted.",
+			"stalk-edits"		: "Mock members for editing their messages.",
+			"limit-access"		: "Disable music player commands for users without enough rights.",
+			"enable-filter"		: "Enable or disable the words filtering feature of the GalaxyBot. Requires GalaxyBot to have the **Manage messages** permission in text channels for messages and roles filtering, as well as **Manage nicknames** for nicknames filtering.",
+			"filtered-words"	: "Remove messages, reactions and nicknames containing one (or more) of following words.",
+			"filter-admins"		: "Whether the word filter should work on administrators and GalaxyBot managers.",
+			"text-responses"	: "Let GalaxyBot react with some preprogrammed responses to messages.",
+			"mocking-joy"		: "Make fun of people, who tend to overuse the 😂 joy emoji."
 		};
 
 		// Setting not specified.
 		if (!settingName) {
-			message.channel.send(this.compose("To change a setting, specify `name` and `value` in this command. Available settings are: %1.", Object.keys(possibleSet).join(", ")));
+			message.channel.send("To change a setting, specify `name` and `value` in this command. Available settings are: " + Object.keys(possibleSet).join(", ") + ".");
 			this.log(botGuild, "Invalid command params: no setting name specified.");
 			return;
 		}
 
 		// Unknown setting.
 		if (!possibleSet[settingName]) {
-			message.channel.send(this.compose("Unknown setting: **%1**. Send empty `settings` command to see available settings.", settingName));
+			message.channel.send("Unknown setting: **" + settingName + "**. Send empty `settings` command to see available settings.");
 			this.log(botGuild, "Unknown setting: " + settingName);
 			return;
 		}
@@ -1567,7 +2059,12 @@ class GalaxyBot {
 				case "embed-titles" :
 				case "embed-maps" : 
 				case "stalk-edits" : 
-				case "unit-convert" : {
+				case "limit-access" :
+				case "enable-filter" :
+				case "filter-admins" :
+				case "text-responses" :
+				case "filter-admins" :
+				case "mocking-joy" : {
 					settingValue = settingValue.toLowerCase();
 
 					// Setting must be boolean.
@@ -1591,41 +2088,66 @@ class GalaxyBot {
 					var explode = settingValue.split(" ");
 					var action = explode.shift();
 					var roleName = explode.join(" ");
+					var roleId = 0;
+					var guildRoles = [];
 
-					var currentRoles = this.config.settings.roles.split(",");
-					if (botGuild.settings.roles) currentRoles = botGuild.settings.roles.split(",");
+					var currentRoles = [];
+					if (botGuild.settings.roles) currentRoles = botGuild.settings.roles;
+
+					// Find a role with matching name
+					message.guild.roles.forEach((role, snowflake) => {
+						guildRoles.push(snowflake);
+
+						if (!role.name.match(roleName)) return;
+
+						roleName = role.name;
+						roleId = snowflake;
+					});
+
+					// Remove roles, which don't exist anymore.
+					if (currentRoles.length > 0) {
+						var cleanedList = [];
+
+						for (var i = 0; i < currentRoles.length; i++) {
+							var snowflake = currentRoles[i];
+							if (guildRoles.indexOf(snowflake) == -1) continue;
+							cleanedList.push(snowflake);
+						}
+
+						currentRoles = cleanedList;
+						botGuild.settings.roles = currentRoles;
+					}
+
+					// Role not found.
+					if (action != "" && roleId == 0) {
+						message.channel.send("I couldn't find any role matching **" + roleName + "**.");
+						this.log(botGuild, "Role not found.");
+						return;
+					} 
 
 					// Add new role.
 					if (action == "add") {
 						// Role already exists.
-						if (currentRoles.indexOf(roleName) != -1) {
+						if (currentRoles.indexOf(roleId) != -1) {
 							message.channel.send("This role already exists.");
 							return;
 						}
 						else {
-							currentRoles.push(roleName);
-							var targetValue = currentRoles.join(",");
-
-							// Value too long
-							if (targetValue.length > 256) {
-								message.channel.send("Couldn't add new role, roles list would be too long!");
-								return;
-							}
-
-							else botGuild.settings.roles = targetValue;
+							currentRoles.push(roleId);
+							botGuild.settings.roles = currentRoles;
 						}
 					}
 
 					// Remove a role.
 					else if (action == "remove") {
 						// Role doesn't exist.
-						if (currentRoles.indexOf(roleName) == -1) {
+						if (currentRoles.indexOf(roleId) == -1) {
 							message.channel.send("This role doesn't exist.");
 							return;
 						}
 						else {
-							currentRoles.splice(currentRoles.indexOf(roleName), 1);
-							botGuild.settings.roles = currentRoles.join(",");
+							currentRoles.splice(currentRoles.indexOf(roleId), 1);
+							botGuild.settings.roles = currentRoles;
 						}
 					}
 
@@ -1636,7 +2158,7 @@ class GalaxyBot {
 					}
 
 					// Remove value if set to default.
-					if (botGuild.settings.roles == this.config.settings.roles) {
+					if (botGuild.settings.roles.length <= 0) {
 						delete botGuild.settings.roles;
 					}
 
@@ -1742,6 +2264,79 @@ class GalaxyBot {
 
 					break;
 				}
+
+				// Word filter.
+				case "filtered-words" : {
+					// Look for invalid configuration.
+					if (!this.config.filter || isNaN(this.config.filter.min) || isNaN(this.config.filter.max) || isNaN(this.config.filter.count)) {
+						message.channel.send("Words filter configuration is invalid. Please contact the GalaxyBot owner!");
+						this.log(botGuild, "Incorrect words filter configuration.");
+						return;
+					}
+
+					var explode = settingValue.split(" ");
+					var action = explode.shift();
+					var word = explode.join(" ");
+
+					var currentWords = [];
+					if (botGuild.settings["filtered-words"]) currentWords = botGuild.settings["filtered-words"];
+
+					// Word too short or too long.
+					if (word.length < this.config.filter.min || word.length > this.config.filter.max) {
+						message.channel.send("This word length doesn't match length requirement, try something between " + this.config.filter.min + " and " + this.config.filter.max + " characters.");
+						this.log(botGuild, "Word \"" + word + "\" too short or too long.");
+						return;
+					} 
+
+					// Add new word.
+					if (action == "add") {
+						// Word already exists.
+						if (currentWords.indexOf(word) != -1) {
+							message.channel.send("This word is already set in the filter.");
+							this.log(botGuild, "Word \"" + word + "\" already exists.");
+							return;
+						}
+						// Too many words.
+						else if (this.config.filter.count > 0 && currentWords.length >= this.config.filter.count) {
+							message.channel.send("You've reached the maximum number of filtered words (" + this.config.filter.count + ").");
+							this.log(botGuild, "Filtered words words limit reached (" + this.config.filter.count + "/" + this.config.filter.count + ").");
+							return;
+						}
+						else {
+							currentWords.push(word);
+							botGuild.settings["filtered-words"] = currentWords;
+							this.log(botGuild, "Word \"" + word + "\" added (" + currentWords.length + "/" + this.config.filter.count + ").");
+						}
+					}
+
+					// Remove a word.
+					else if (action == "remove") {
+						// Word doesn't exist.
+						if (currentWords.indexOf(word) == -1) {
+							message.channel.send("This word is not filtered.");
+							this.log(botGuild, "Word \"" + word + "\" doesn't exist.");
+							return;
+						}
+						else {
+							currentWords.splice(currentWords.indexOf(word), 1);
+							botGuild.settings["filtered-words"] = currentWords;
+							this.log(botGuild, "Word \"" + word + "\" removed (" + currentWords.length + "/" + this.config.filter.count + ").");
+						}
+					}
+
+					// Incorrect action.
+					else {
+						message.channel.send("Specify a valid action to perform: `add` or `remove`.");
+						return;
+					}
+
+					// Remove value if set to default.
+					if (botGuild.settings["filtered-words"].length <= 0) {
+						delete botGuild.settings["filtered-words"];
+					}
+
+					break;
+				}
 			}
 
 			botGuild.saveSettings();
@@ -1753,16 +2348,33 @@ class GalaxyBot {
 		var defaultValue = this.config.settings[settingName];
 		var currentValue = isDefined ? botGuild.settings[settingName] : defaultValue;
 
-		// Music player channels.
-		if (settingName == "music-cmd-ch") {
-			defaultValue = "";
+		// Bot control roles.
+		if (settingName == "roles" && isDefined) {
+			var rolesNames = [];
 
+			message.guild.roles.forEach((role, snowflake) => {
+				if (currentValue.indexOf(snowflake) < 0) return;
+				rolesNames.push(role.name);
+			});
+
+			currentValue = rolesNames.join(", ");
+		}
+
+		// Music player channels.
+		if (settingName == "music-cmd-ch" && isDefined) {
 			var channelsTags = [];
+
 			for (var i = 0; i < currentValue.length; i++) {
 				var channelId = currentValue[i];
 				channelsTags.push("<#" + channelId + ">");
 			}
+
 			currentValue = channelsTags.join(", ");
+		}
+
+		// Filtered words.
+		if (settingName == "filtered-words" && isDefined) {
+			currentValue = currentValue.join(", ");
 		}
 
 		message.channel.send(new Discord.RichEmbed({
@@ -1771,11 +2383,11 @@ class GalaxyBot {
 				value: possibleSet[settingName]
 			}, {
 				name: "Current value",
-				value: (currentValue !== "" ? currentValue : "<undefined>"),
+				value: (currentValue !== undefined ? currentValue : "<undefined>"),
 				inline: true
 			}, {
 				name: "Default value",
-				value: (defaultValue !== "" ? defaultValue : "<undefined>"),
+				value: (defaultValue !== undefined ? defaultValue : "<undefined>"),
 				inline: true
 			}]
 		}));
