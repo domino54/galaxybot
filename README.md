@@ -16,7 +16,7 @@ Reference: `command <mandatory> [optional]`.
 | `invite`                  | Sends link allowing users to add the bot to their server.
 | `guilds`                  | The number of guilds the bot is active in. List featuring guilds names is available only to the bot owner, through a direct message.
 | `avatar [name]`           | Sends you direct link to your or someone's avatar.
-| `settings [name] <value>` | Manage bot settings in the server. Anyone can view bot settings, however only the GalaxyBot managers can edit them. See the [settings list](#Settings) below for more information.
+| `settings <name> [value]` | Manage bot settings in the server. Anyone can view bot settings, however only the GalaxyBot managers can edit them. See the [settings list](#Settings) below for more information.
 | `time`                    | Current time of the bot server machine.
 
 ### ManiaPlanet
@@ -42,12 +42,12 @@ Instead of using title `id` in commands you can use one of following short codes
 | `play <url\|query> [now\|next]` | Connects to a voice channel and plays audio from given link. If something different than URL is given, bot will search YouTube and play first result. `now` and `next` allow administrators to play the track instantly or insert it at the beginning of the queue.
 | `undo`                          | Removes latest track added by the user.
 | `now`                           | Shows what is currently being played.
-| `next [me|order]`               | Shows name of the next track in the queue. `me` shows upcoming song requested by you. `order` can tell what song is at specific queue position.
+| `next [me\|order]`               | Shows name of the next track in the queue. `me` shows upcoming song requested by you. `order` can tell what song is at specific queue position.
 | `queue`                         | Lists up to 10 first entries in the queue.
 | `skip`                          | Skips currently played song. Administrators can skip any song, while other users may skip it only it it's been requested by them.
 | `stop`                          | Allows administrators to stop music playback and clear the queue.
 | `pause`                         | Pauses the current track playback. The same command will resume the playback.
-| `limit-access`                  | 
+| `limit-access`                  | Shortcut to toggle the `limit-access` setting, which restricts the music player access to the GalaxyBot managers only.
 
 ## Settings
 Available bot settings, which server administrators can tweak to customize the bot's behavior.
@@ -62,7 +62,6 @@ Available bot settings, which server administrators can tweak to customize the b
 | `music-cmd-ch`    | `slowflake[]` | `[]`    | The only channels, where music player commands are accepted.
 | `max-duration`    | `int`         | `600`   | Maximum duration (in seconds) of music tracks users without full permissions can play. `0` = no limit.
 | `limit-access`    | `bool`        | `false` | Disable music player commands for users without enough rights.
-| `unit-convert`    | `bool`        | `false` | Convert imperial (retarded) unit system values into metric.
 | `stalk-edits`     | `bool`        | `false` | Mock members for editing their messages.
 | `enable-filter`   | `bool`        | `true`  | Enable or disable the words filtering feature of the GalaxyBot. Requires GalaxyBot to have the **Manage messages** permission in text channels for messages and roles filtering, as well as **Manage nicknames** for nicknames filtering.
 | `filtered-words`  | `string[]`    | `[]`    | Remove messages, reactions and nicknames containing one (or more) of following words.
