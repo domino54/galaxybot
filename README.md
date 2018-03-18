@@ -30,8 +30,8 @@ Reference: `command <mandatory> [optional]`.
 | `title <id\|code>`          | Shows information about the given title from the [ManiaPlanet website](http://maniaplanet.com/).
 | `map <uid>`                 | Shows information about the given map from ManiaPlanet website.
 | `mx <tm\|sm> <id\|query>`   | Search for a [Mania Exchange](http://mania-exchange.com/) map by its ID or the map name.
-| `mpserver <login|query>`    | Find a ManiaPlanet server by its login or name and show its current status.
-| `addserver <login|query>`   | Add a ManiaPlanet server status to the statuses channel. Up to 10 servers will be detected and updated.
+| `mpserver <login\|query>`   | Find a ManiaPlanet server by its login or name and show its current status.
+| `addserver <login\|query>`  | Add a ManiaPlanet server status to the statuses channel. Up to 10 servers will be detected and updated.
 
 Bot automatically reacts to ManiaPlanet titles and maps links, as well as Mania Exchange maps links. This can be turned off via guild settings.
 
