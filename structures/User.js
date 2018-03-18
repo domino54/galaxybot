@@ -6,11 +6,14 @@ class User {
 	/**
 	 * Create an user object.
 	 *
-	 * @param {Snowflake} userId - Id of the new user to register.
+	 * @param {User} user - Discord User object
+	 * @param {GalaxyBot} galaxybot - GalaxyBot, obviously.
 	 */
-	constructor(userId) {
-		this.id = userId;
-		this.name = "";
+	constructor(user, galaxybot) {
+		this.id = user.id;
+		this.user = user;
+		this.galaxybot = galaxybot;
+		this.type = "user";
 
 		this.annoyanceTimestamp = 0; ///< Later computed into annoyance level
 		this.warnedForJoyEmoji = false;
@@ -24,6 +27,29 @@ class User {
 		this.askedToCryChannel = false; ///< Channel snowflake
 	}
 
+	/**
+	 * Log guild action in GalaxyBot logger.
+	 *
+	 * @param {string} text - The message to log.
+	 */
+	log(text) {
+		this.galaxybot.log(this, text);
+	}
+
+	/**
+	 * Get the GalaxyBot default setting.
+	 *
+	 * @param {string} settingName - Name of the setting to get.
+	 * @returns {*} Default value of the setting. `undefined` if not found.
+	 */
+	getSetting(settingName) {
+		if (this.galaxybot.config.settings[settingName] !== undefined) return this.galaxybot.config.settings[settingName];
+		return undefined;
+	}
+
+	/**
+	 * Lower the user karma for even worse text responses.
+	 */
 	lowerKarma() {
 		const now = Math.floor(Date.now() / 1000);
 
@@ -31,6 +57,9 @@ class User {
 		this.annoyanceTimestamp += 60;
 	}
 
+	/**
+	 * Get how much GalaxyBot hates the user.
+	 */
 	get annoyanceLevel() {
 		const now = Math.floor(Date.now() / 1000);
 

@@ -1,6 +1,6 @@
 GalaxyBot
 =========
-A Discord bot capable of playing some music and doing other stuff. Pretty cute, too.
+A Discord bot providing multiple integrations for Nadeo games in ManiaPlanet platform, capable of playing some music and doing other useless stuff. Sometimes behaves extremely impolitely, but that's just her nature.
 
 ## Commands
 All available commands of the GalaxyBot. Default command prefix is `!`.
@@ -11,25 +11,29 @@ Reference: `command <mandatory> [optional]`.
 
 | Command                   | Description |
 |:-------------------------:| ----------- |
-| `dommy`                   | Mentions [Dommy](https://github.com/domino54/) with a thinking gif. 🤔
-| `git`                     | Paste a link to this repository.
-| `invite`                  | Sends link allowing users to add the bot to their server.
-| `guilds`                  | The number of guilds the bot is active in. List featuring guilds names is available only to the bot owner, through a direct message.
+| `about`                   | Shows some details about the GalaxyBot.
+| `help [command]`          | Sends a link to the commands reference or a description of the given command.
+| `dommy`                   | Mention [`Dommy#7014`](https://github.com/domino54/) with a thinking GIF. 🤔
+| `git`                     | Sends a link to the GitHub repository with source code of the GalaxyBot.
+| `invite`                  | Sends a link, which allows the user to add GalaxyBot to their server.
+| `guilds`                  | The number of guilds GalaxyBot is active in. Full list featuring guilds names is available only to the bot owner, through a direct message.
 | `avatar [name]`           | Sends you direct link to your or someone's avatar.
-| `settings <name> [value]` | Manage bot settings in the server. Anyone can view bot settings, however only the GalaxyBot managers can edit them. See the [settings list](#Settings) below for more information.
-| `time`                    | Current time of the bot server machine.
+| `settings <name> [value]` | Manage the GalaxyBot settings in the server. Anyone can view the bot settings, however only the GalaxyBot managers can edit them. See the [settings list](#Settings) below for more information.
+| `time`                    | Current time of the machine GalaxyBot is running on.
 
 ### ManiaPlanet
 
-| Command                   | Description |
-|:-------------------------:| ----------- |
-| `channel <sm\|tm>`        | See what's currently being played on channels.
-| `servers <id\|code>`      | Listing up to 10 most populated servers of a specific ManiaPlanet title.
-| `title <id\|code>`        | Shows information about given title from [ManiaPlanet website](http://maniaplanet.com/).
-| `map <uid>`               | Shows information about given map from ManiaPlanet website.
-| `mx <tm\|sm> <id\|query>` | Search for [Mania Exchange](http://mania-exchange.com/) map by ID or map name.
+| Command                     | Description |
+|:---------------------------:| ----------- |
+| `channel <sm\|tm>`          | See what's currently being played on channels. Use `sm` for ShootMania channel and `tm` for TrackMania channel.
+| `servers <id\|code> [page]` | Listing up to 10 most populated servers of a specific ManiaPlanet title. By adding `page`, you can navigate through the list.
+| `title <id\|code>`          | Shows information about the given title from the [ManiaPlanet website](http://maniaplanet.com/).
+| `map <uid>`                 | Shows information about the given map from ManiaPlanet website.
+| `mx <tm\|sm> <id\|query>`   | Search for a [Mania Exchange](http://mania-exchange.com/) map by its ID or the map name.
+| `mpserver <login|query>`    | Find a ManiaPlanet server by its login or name and show its current status.
+| `addserver <login|query>`   | Add a ManiaPlanet server status to the statuses channel. Up to 10 servers will be detected and updated.
 
-Bot automatically reacts to ManiaPlanet titles and maps links, as well as Mania Exchange maps links. This can be turned off via guild ettings.
+Bot automatically reacts to ManiaPlanet titles and maps links, as well as Mania Exchange maps links. This can be turned off via guild settings.
 
 Instead of using title `id` in commands you can use one of following short codes: canyon, storm, stadium, valley, lagoon, galaxy, pursuit, pursuit-s, royal, siege, battle, elite, combo, joust, warlords, heroes, tm2, competition, rpg, obstacle, stormuim, infection, speedball, alpine.
 
@@ -39,18 +43,19 @@ Instead of using title `id` in commands you can use one of following short codes
 
 | Command                         | Description |
 |:-------------------------------:| ----------- |
-| `play <url\|query> [now\|next]` | Connects to a voice channel and plays audio from given link. If something different than URL is given, bot will search YouTube and play first result. `now` and `next` allow administrators to play the track instantly or insert it at the beginning of the queue.
-| `undo`                          | Removes latest track added by the user.
+| `play <url\|query> [now\|next]` | Connects to a voice channel and plays audio from the given link. If an invalid URL is given, GalaxyBot will search the phrase in YouTube and play the first playable result. `now` and `next` allow GalaxyBot managers to play the track instantly or insert it at the beginning of the queue. If an audio file is attached to the message, GalaxyBot will attempt to play it.
+| `playattachment [#] [channel]`  | Puts the latest audio file attachment sent in the channel in the queue. `#` can be used to determine which attachment should be played. Adding the `channel` parameter will search for an attachment in this particular channel.
+| `undo`                          | Removes the latest track you've requested.
 | `now`                           | Shows what is currently being played.
-| `next [me\|order]`               | Shows name of the next track in the queue. `me` shows upcoming song requested by you. `order` can tell what song is at specific queue position.
-| `queue`                         | Lists up to 10 first entries in the queue.
-| `skip`                          | Skips currently played song. Administrators can skip any song, while other users may skip it only it it's been requested by them.
-| `stop`                          | Allows administrators to stop music playback and clear the queue.
+| `next [me\|order]`              | Shows details of the next track in the queue. `me` shows upcoming song requested by you. `order` can tell which track is at specific position in the queue.
+| `queue`                         | Lists up to 10 upcoming entries in the music player queue. `me` can be used to list upcoming tracks requested by you.
+| `skip`                          | Skips the currently played song. GalaxyBot managers can skip any song, while other users may skip it only if it's been requested by them.
+| `stop`                          | Allows GalaxyBot managers to stop music playback and clear the queue.
 | `pause`                         | Pauses the current track playback. The same command will resume the playback.
 | `limit-access`                  | Shortcut to toggle the `limit-access` setting, which restricts the music player access to the GalaxyBot managers only.
 
 ## Settings
-Available bot settings, which server administrators can tweak to customize the bot's behavior.
+Available GalaxyBot settings, which server administrators can tweak to customize the bot behavior.
 
 | Setting           | Type          | Default | Description |
 |:-----------------:|:-------------:|:-------:| ----------- |
@@ -68,12 +73,14 @@ Available bot settings, which server administrators can tweak to customize the b
 | `filter-admins`   | `bool`        | `false` | Whether the word filter should work on messages sent by administrators and GalaxyBot managers.
 | `text-responses`  | `bool`        | `true`  | Let GalaxyBot react with some preprogrammed responses to messages.
 | `mocking-joy`     | `bool`        | `true`  | Make fun of people, who tend to overuse the 😂 joy emoji.
+| `servers-status`  | `snowflake`   | `null`  | Text channel, where GalaxyBot will post and update statuses of selected ManiaPlanet servers, added using the `addserver` command. Up to 10 latest messages sent in the channel will show a status below them.
 
 Settings with array type require `add` and `remove` keywords, for example `!setings music-cmd-ch add #music-bot`.
 
 ## Screenshots
 
-![Lagoon title card](https://i.imgur.com/n41wMvK.png)
-![Music player](https://i.imgur.com/hGyRSFq.png)
-![ShootMania channel](https://i.imgur.com/95Z3hSG.png)
+![Storm title card](https://i.imgur.com/Vf8J249.png)
+![Music player](https://i.imgur.com/SCmZLUS.png)
+![TrackMania channel](https://i.imgur.com/KwlzJwn.png)
 ![Mania Exchange map](https://i.imgur.com/2FIayqY.png)
+![Servers status](https://i.imgur.com/FTZ7MXG.png)
