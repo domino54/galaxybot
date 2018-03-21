@@ -1,10 +1,9 @@
 const Track = require("./../structures/Track.js");
-const yt_search = require("youtube-search");
 const URL = require("url");
 
 module.exports = {
 	name: "play",
-	description: "Connects to a voice channel and plays audio from the given link. If an invalid URL is given, GalaxyBot will search the phrase in YouTube and play the first playable result. `now` and `next` allow GalaxyBot managers to play the track instantly or insert it at the beginning of the queue. If an audio file is attached to the message, GalaxyBot will attempt to play it.",
+	description: "Connects to a voice channel and plays audio from the given link. You can request videos from YouTube, Facebook and Streamable, send direct link to a file or a YouTube playlist (up to 100 videos). If an invalid URL is given, GalaxyBot will search the phrase in YouTube and play the first playable result. `now` and `next` allow GalaxyBot managers to play the track instantly or insert it at the beginning of the queue. If an audio file is attached to the message, GalaxyBot will attempt to play it.",
 	serverOnly: true,
 	musicPlayer: true,
 	limitedAccess: true,
@@ -12,14 +11,14 @@ module.exports = {
 	execute: command => {
 		// Music player not running and user is not in a voice channel.
 		if (!command.botGuild.voiceConnection && !command.member.voiceChannel) {
-			command.channel.send("You need join a voice channel before I can start playing anything, <@" + command.user.id + ">. :loud_sound:");
+			command.channel.send(`You need join a voice channel before I can start playing anything, ${command.user}. :loud_sound:`);
 			command.botGuild.log("User not in any voice channel.");
 			return;
 		}
 
 		// User not in our voice channel.
 		if (command.botGuild.voiceConnection && command.member.voiceChannel != command.botGuild.voiceConnection.channel && !command.botGuild.isGalaxyBotManager(command.member)) {
-			command.channel.send("You need to join my voice channel if you want to request something, <@" + command.user.id + ">. :point_up:");
+			command.channel.send(`You need to join my voice channel if you want to request something, ${command.user}. :point_up:`);
 			command.botGuild.log("User not in voice channel with bot.");
 			return;
 		}
@@ -43,13 +42,13 @@ module.exports = {
 				const isNext = isNow || command.arguments[0] === "next";
 
 				var track = new Track(attachmentURL, command.member, track => {
-					command.botGuild.onTrackCreated(track, command.member, attachmentURL, isNext, isNow);
+					command.botGuild.onTrackCreated(track, command.member, attachmentURL, { next: isNext, now: isNow });
 				});
 			}
 
 			// Invalid attachments.
 			else {
-				command.channel.send("I can't play any of the files you just sent me, <@" + command.user.id + ">. :cry:");
+				command.channel.send(`I can't play any of the files you just sent me, ${command.user}. :cry:`);
 				command.botGuild.log("No compatible audio attachments sent with command.");
 				return;
 			}
@@ -59,22 +58,24 @@ module.exports = {
 
 		// URL not specified
 		if (command.arguments.length <= 0) {
-			command.channel.send("First of all, you need to tell me what should I play, <@" + command.user.id + ">. :shrug:");
+			command.channel.send(`First of all, you need to tell me what should I play, ${command.user}. :shrug:`);
 			command.botGuild.log("No query specified.");
 			return;
 		}
 
 		// Create a new track object for the speicifed URL.
-		var query = command.arguments.join(" ");
-		var url = command.arguments[0].replace(/<|>/g, "");
+		const ytAvailable = command.galaxybot.config.youtube && command.galaxybot.config.youtube.token;
+		const query = command.arguments.join(" ");
+		const url = command.arguments[0].replace(/<|>/g, "");
+		const ytlist = query.match(/^https?:\/\/(www\.)?(youtu\.be|youtube\.com)\/playlist\?list=[\w-]+/g);
 
-		command.botGuild.log("Track requested by " + command.user.tag + ": " + query);
+		command.botGuild.log(`Track requested by ${command.user.tag}: "${query}"`);
 
 		// Try to load track from a local file.
 		if (query.match(/^[A-Z]:(\/|\\)/)) {
 			// Unauthorized.
 			if (command.member.id != command.galaxybot.config.dommy) {
-				command.channel.send("Sorry <@" + command.user.id + ">, but only my creator is allowed to play music from the server storage. :no_entry:");
+				command.channel.send(`Sorry ${command.user}, but only my creator is allowed to play music from the server storage. :no_entry:`);
 				command.botGuild.log("Not authorized to use server resources.");
 				return;
 			}
@@ -84,36 +85,82 @@ module.exports = {
 			});
 		}
 
+		// Load YouTube playlist.
+		else if (ytlist) {
+			// Can't download YouTube playlist info: API token not provided.
+			if (!ytAvailable) {
+				command.channel.send("I can't add YouTube playlists, API token is missing in my configuration file! :rolling_eyes:");
+				command.botGuild.log("Wrong YouTube configuration: token not specified.");
+				return;
+			}
+
+			const playlistURL = ytlist[0];
+			const playlistID = playlistURL.match(/[\w-]+$/)[0];
+			
+			command.botGuild.addPlaylistYouTube(playlistID, command.member).then(nbVideos => {
+				if (nbVideos > 0) {
+					command.channel.send(`Okay ${command.user}, I'm adding **${nbVideos}** tracks from your playlist to the queue!`);
+				}
+			}).catch(error => {
+				var errorMessage;
+
+				switch (error) {
+					// YouTube is unavailable.
+					case "yt unavailable" :
+						errorMessage = "I can't search for tracks in YouTube, API token is missing in my configuration file! :rolling_eyes:";
+						break;
+
+					// Unknown.
+					default : errorMessage = "An error has occured while I was searching on YouTube. If the problem persists, please contact my creator!";
+				}
+
+				command.channel.send(errorMessage);
+				command.botGuild.log("Error occured while adding YouTube playlist: " + error);
+			});
+		}
+
 		// Try to load track from given URL.
 		else if (URL.parse(url).hostname) {
 			const isNow = command.arguments[1] === "now";
 			const isNext = isNow || command.arguments[1] === "next";
 
 			var track = new Track(url, command.member, track => {
-				command.botGuild.onTrackCreated(track, command.member, url, isNext, isNow);
+				command.botGuild.onTrackCreated(track, command.member, url, { next: isNext, now: isNow });
 			});
-		}
-
-		// Can't search in YouTube: API token not provided.
-		else if (!command.galaxybot.config.youtube || !command.galaxybot.config.youtube.token) {
-			command.channel.send("I can't search for tracks in YouTube, API token is missing in my configuration file! :rolling_eyes:");
-			command.botGuild.log("Wrong YouTube configuration: token not specified.");
 		}
 
 		// Search for the track in YouTube.
 		else {
-			var options = {
-				maxResults: 10,
-				key: command.galaxybot.config.youtube.token
-			};
-
-			yt_search(query, options, (error, results) => {
-				if (error) return console.log(error);
-				if (results.length > 0) {
-				 	var track = new Track(results[0].link, command.member, track => {
-						command.botGuild.onTrackCreated(track, command.member, url);
-					});
+			command.botGuild.searchYouTube(query, command.member).then(nbVideos => {
+				// A playlist has been added.
+				if (nbVideos > 0) {
+					command.channel.send(`Okay ${command.user}, I'm adding **${nbVideos}** tracks from your playlist to the queue!`);
 				}
+			}).catch(error => {
+				var errorMessage;
+
+				switch (error) {
+					// YouTube is unavailable.
+					case "yt unavailable" :
+						errorMessage = "I can't search for tracks in YouTube, API token is missing in my configuration file! :rolling_eyes:";
+						break;
+
+					// Incorrect query specified.
+					case "bad query" :
+						errorMessage = `First of all, you need to tell me what should I play, ${command.user}. :shrug:`;
+						break;
+
+					// YouTube is unavailable.
+					case "no results" :
+						errorMessage = `I couldn't find anything matching **${command.galaxybot.escapeMentions(query)}**, ${command.user}. :cry:`;
+						break;
+					
+					// Unknown.
+					default : errorMessage = "An error has occured while I was searching on YouTube. If the problem persists, please contact my creator!";
+				}
+
+				command.channel.send(errorMessage);
+				command.botGuild.log("Error occured while searching in YouTube: " + error);
 			});
 		}
 	}

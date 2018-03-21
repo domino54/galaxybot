@@ -1,6 +1,9 @@
 const ManiaPlanet = require("./../integrations/ManiaPlanet.js");
 const Track = require("./Track.js");
 const Discord = require("discord.js");
+const ytdl = require("ytdl-core");
+const yt_search = require("youtube-search");
+const yt_playlist = require("youtube-playlist-info");
 const fs = require("fs");
 const settingsDir = "./guilds/";
 
@@ -40,19 +43,27 @@ class Guild {
 		this.galaxybot = galaxybot;
 		this.type = "guild";
 
+		// Music player.
 		this.lastTextChannel = undefined;
 		this.voiceConnection = undefined;
 		this.voiceDispatcher = undefined;
+		this.activeStream = undefined;
+
+		// Tracks queue.
 		this.currentTrack = undefined;
 		this.tracksQueue = [];
+		this.uniqueTracks = [];
+		this.pendingTimers = [];
+		this.lastStop = 0;
 
+		// Behaviour.
 		this.latestTimeMinute = -1;
 		this.sameTimeStreak = 0;
-
 		this.lastServersUpdate = 0;
+		this.nextPurgeAllowed = 0;
 
 		// Guild settings file.
-		this.settings = undefined;
+		this.settings = new Object();
 		this.settingsPath = settingsDir + this.id + ".json";
 		this.readSettings();
 	}
@@ -68,9 +79,10 @@ class Guild {
 			}
 
 			try {
-				var settings = JSON.parse(data);
-				if (settings) this.settings = settings;
+				this.settings = JSON.parse(data);
+				if (typeof this.settings !== "object") this.settings = new Object();
 			}
+
 			catch (exception) {
 				console.log(exception);
 			}
@@ -81,10 +93,11 @@ class Guild {
 	 * Saves guild settings on disk.
 	 */
 	saveSettings() {
-		if (!this.settings) return false;
+		var contents = JSON.stringify(this.settings);
+		if (contents === undefined) contents = "{}";
 
-		fs.writeFile(this.settingsPath, JSON.stringify(this.settings), error => {
-			if (error != null) console.log(error);
+		fs.writeFile(this.settingsPath, contents, error => {
+			if (error) console.log(error);
 		});
 
 		return this.settingsPath;
@@ -117,16 +130,17 @@ class Guild {
 	 * @returns {boolean} `true`, if member can manage GalaxyBot, `false` otherwise.
 	 */
 	isGalaxyBotManager(member) {
+		if (!member) return false;
 		if (this.isAdministrator(member) || member.id == this.galaxybot.config.dommy) return true;
-		if (!this.settings.roles) return false;
+		if (!this.settings || !this.settings.roles) return false;
 
-		for (var roleId in this.settings.roles) {
-			if (this.guild.roles.has(roleId)) return true;
+		for (const roleId of this.settings.roles) {
+			if (member.roles.has(roleId)) return true;
 		}
 	}
 
 	createRolesList() {
-		if (!this.settings.roles) return undefined;
+		if (!this.settings || !this.settings.roles) return undefined;
 
 		var rolesNames = [];
 
@@ -144,7 +158,7 @@ class Guild {
 	 * @returns {boolean} `true`, if the music player is limited, `false` otherwise.
 	 */
 	isPlayerLimitedAccess() {
-		return this.settings["limit-access"] === true;
+		return this.settings && this.settings["limit-access"] === true;
 	}
 
 	/**
@@ -168,14 +182,20 @@ class Guild {
 	 * Looks for next track in the queue and it finds any, plays it.
 	 */
 	playNextTrack() {
+		if (this.currentTrack !== undefined) return;
+
 		this.log("Next track playback requested.");
 
 		// Leave voice channel if queue is empty.
 		if (this.tracksQueue.length <= 0) {
-			if (this.voiceConnection) this.voiceConnection.channel.leave();
+			if (this.voiceConnection) this.voiceConnection.disconnect();
 			this.log("Queue empty, leaving the voice channel.");
 			return;
 		}
+
+		// Pick first track from the queue.
+		this.currentTrack = this.tracksQueue.shift();
+		var trackUniqueID = this.uniqueTracks.shift();
 
 		// This can happen. Often.
 		if (this.voiceConnection === undefined) {
@@ -184,55 +204,70 @@ class Guild {
 			return;
 		}
 
-		// Pick first track from the queue.
-		this.currentTrack = this.tracksQueue.shift();
-
-		// Play stream or direct URL.
+		// Create a voice dispatcher.
 		try {
-			var streamOptions = { passes: 3, bitrate: 44100 };
+			this.log("Creating a new voice dispatcher.");
 
-			if (this.currentTrack.stream) {
-				this.voiceDispatcher = this.voiceConnection.playStream(this.currentTrack.stream, streamOptions);
-			}
-			else if (this.currentTrack.sourceURL) {
-				this.voiceDispatcher = this.voiceConnection.playArbitrary(this.currentTrack.sourceURL, streamOptions);
-			}
-			else if (this.currentTrack.isLocalFile) {
-				this.voiceDispatcher = this.voiceConnection.playFile(this.currentTrack.sourceURL, streamOptions);
-			}
+			switch (this.currentTrack.type) {
+				// Create a stream of YouTube video.
+				case "youtube" : {
+					this.activeStream = ytdl(this.currentTrack.url, (this.currentTrack.isLivestream ? null : { filter: "audioonly" }));
 
-			this.log("Creating new voice dispatcher: " + this.currentTrack.title);
+					this.voiceDispatcher = this.voiceConnection.playStream(this.activeStream, { passes: 3, bitrate: 44100 });
+
+					this.activeStream.on("error", error => {
+						console.log(error);
+					});
+
+					break;
+				}
+
+				// Offline file.
+				case "offline" : {
+					this.voiceDispatcher = this.voiceConnection.playFile(this.currentTrack.sourceURL, streamOptions);
+					break;
+				}
+
+				// All other services are online files.
+				default : {
+					this.voiceDispatcher = this.voiceConnection.playArbitraryInput(this.currentTrack.sourceURL, streamOptions);
+				}
+			}
 		}
-		catch (error) {
-			this.lastTextChannel.send("Something must've gone wrong with last track, I couldn't play it...");
-			this.log("A problem has occured while trying to play track: " + this.currentTrack.title);
-			this.playNextTrack();
 
-			console.log(error);
+		// Super handy error logging.
+		catch (error) {
+			this.lastTextChannel.send("Something must've gone wrong with last track, I couldn't play it... ```" + error + "```");
+			this.log("A problem has occured while trying to play track: " + error);
+			this.currentTrack = undefined;
+			
+			setTimeout(() => { this.playNextTrack(); }, 250);
 			return;
 		}
 
-		if (this.voiceDispatcher) {
-			this.voiceDispatcher.on("end", reason => {
-				this.currentTrack = undefined;
-				this.voiceDispatcher = undefined;
-				this.log("Voice dispatcher end: " + reason);
-				
-				// Delay is necessary for slower connections to don't skip next track immediately.
-				setTimeout(() => { this.playNextTrack(); }, 250);
-			});
+		// Play next track once voice dispatcher ends.
+		this.voiceDispatcher.on("end", reason => {
+			this.log("Voice dispatcher end: " + reason);
+			if (this.activeStream) this.activeStream.destroy();
 
-			this.voiceDispatcher.on("error", error => {
-				console.log(error);
-			});
-		}
+			this.currentTrack = undefined;
+			this.voiceDispatcher = undefined;
+			this.activeStream = undefined;
+
+			// Delay is necessary for slower connections to don't skip next track immediately.
+			setTimeout(() => { this.playNextTrack(); }, 250);
+		});
+
+		this.voiceDispatcher.on("error", error => {
+			console.log(error);
+		});
 
 		// Show what's currently being played.
 		var header = this.currentTrack.isLivestream
-			? "I'm tuned up for the livestream, <@" + this.currentTrack.sender.id + ">! :red_circle:"
-			: "I'm playing your track now, <@" + this.currentTrack.sender.id + ">! :metal:";
+			? `I'm tuned up for the livestream, <@${this.currentTrack.senderId}>! :red_circle:`
+			: `I'm playing your track now, <@${this.currentTrack.senderId}>! :metal:`;
 
-		this.lastTextChannel.send("I'm playing your track now, <@" + this.currentTrack.sender.id + ">! :metal:", this.currentTrack.embed);
+		this.lastTextChannel.send(header, this.currentTrack.embed);
 		this.log("Now playing: " + this.currentTrack.title);
 	}
 
@@ -242,66 +277,90 @@ class Guild {
 	 * @param {Track} track - Newly created track.
 	 * @param {GuildMember} member - Member, which has requested the track.
 	 * @param {string} url - The URL of the track source.
-	 * @param {boolean} isNext - Whether the track should be played next.
-	 * @param {boolean} isNow - Whether we should skip to this track.
+	 * @param {Object} options - The track creation options.
 	 */
-	onTrackCreated(track, member, url, isNext, isNow) {
+	onTrackCreated(track, member, url, options) {
 		if (!member || (!this.voiceConnection && !member.voiceChannel)) return;
+		if (this.lastStop > 0 && Date.now() - this.lastStop < 1000) return; // Playlist spam prevention.
 
-		var hasPermissions = this.isGalaxyBotManager(member);
+		var errorMessage, hasPermissions = this.isGalaxyBotManager(member);
 
-		// Let's just ignore the fact we're in "onTrackCreated" method - track has been not created.
-		if (track === undefined) {
-			this.lastTextChannel.send("Sorry <@" + member.id + ">, but I can't play anything from that link. :shrug:");
-			this.log("Track " + url + " not added: no information.");
-			return;
-		}
+		// Track options.
+		const isSilent	= options && options.silent === true;
+		const isNext	= options && options.next === true;
+		const isNow		= options && options.now === true;
 
 		// The possible error codes upon track creation.
 		switch (track) {
+			// Let's just ignore the fact we're in "onTrackCreated" method - track has been not created.
+			case undefined : {
+				errorMessage = `Sorry ${member}, but I can't play anything from that link. :shrug:`;
+				this.log(`Track "${url}" not added: no information.`);
+				break;
+			}
+
 			// Unsupported link type.
 			case "unsupported" : {
-				this.lastTextChannel.send("I can't play that resource, <@" + member.id + ">. Make sure you're requesting something from YouTube, Facebook, Streamable or uploading a music file attachment. :rolling_eyes:\n```Error code: " + track + "```");
-				this.log("Track " + url + " not added: unsupported host.");
+				errorMessage = `I can't play that resource, ${member}. Make sure you're requesting a video from YouTube, Facebook, Streamable, a YouTube playlist or uploading a music file attachment. :rolling_eyes:\n\`\`\`Error code: ${track}\`\`\``;
+				this.log(`Track "${url}" not added: unsupported host.`);
+				break;
 			}
 
 			// ytdl-core failed us again.
 			case "ytdl-no-info" : {
-				this.lastTextChannel.send("Sorry <@" + member.id + ">, I couldn't obtain information about your YouTube video. :cry:\n```Error code: " + track + "```");
-				this.log("Track " + url + " not added: failed to obtain YouTube video information.");
-			}
-
-			// Couldn't create a YouTube stream.
-			case "yt-stream-fail" : {
-				this.lastTextChannel.send("Sorry <@" + member.id + ">, but it was impossible for me to stream your YouTube video. :cry:\n```Error code: " + track + "```");
-				this.log("Track " + url + " not added: failed to create YouTube stream.");
+				errorMessage = `Sorry ${member}, I couldn't obtain information about your YouTube video. :cry:\n\`\`\`Error code: ${track}\`\`\``;
+				this.log(`Track "${url}" not added: failed to obtain YouTube video information.`);
+				break;
 			}
 
 			// No information from Facebook.
 			case "fb-no-info" : {
-				this.lastTextChannel.send("Sorry <@" + member.id + ">, I couldn't obtain information about your Facebook video. :cry:\n```Error code: " + track + "```");
-				this.log("Track " + url + " not added: failed to obtain Facebook video information.");
+				errorMessage = `Sorry ${member}, I couldn't obtain information about your Facebook video. :cry:\n\`\`\`Error code: ${track}\`\`\``;
+				this.log(`Track "${url}" not added: failed to obtain Facebook video information.`);
+				break;
 			}
 
 			// No access to the file.
 			case "file-no-access" : {
-				this.lastTextChannel.send("Sorry <@" + member.id + ">, looks like I don't have access to this file, or it doesn't exist. :|\n```Error code: " + track + "```");
-				this.log("Track " + url + " not added: no file access.");
+				errorMessage = `Sorry ${member}, looks like I don't have access to this file, or it doesn't exist. :|\n\`\`\`Error code: ${track}\`\`\``;
+				this.log(`Track "${url}" not added: no file access.`);
+				break;
 			}
 
 			// No music metadata.
 			case "file-no-metadata" : {
-				this.lastTextChannel.send("Sorry <@" + member.id + ">, I couldn't obtain the file's metadata. :cry:\n```Error code: " + track + "```");
-				this.log("Track " + url + " not added: failed to obtain file metadata.");
+				errorMessage = `Sorry ${member}, I couldn't obtain the file's metadata. :cry:\n\`\`\`Error code: ${track}\`\`\``;
+				this.log(`Track "${url}" not added: failed to obtain file metadata.`);
+				break;
 			}
 		}
 
-		if (!track instanceof Track) return;
+		// Send the error message.
+		if (errorMessage && !isSilent) {
+			this.lastTextChannel.send(errorMessage);
+		}
+
+		if (typeof track !== "object") return;
+
+		// The track is currently playing.
+		if (this.currentTrack && this.currentTrack.uniqueID == track.uniqueID) {
+			if (!isSilent) this.lastTextChannel.send(`I'm playing **${track.title}** right now, ${member}. You can request something else. :wink:`);
+			this.log(`Track "${track.title}" not added: the same ID is currently played.`);
+			return;
+		}
+
+		// The track already exists in the queue.
+		if (this.uniqueTracks.includes(track.uniqueID)) {
+			const position = this.uniqueTracks.indexOf(track.uniqueID) + 1;
+			if (!isSilent) this.lastTextChannel.send(`**${track.title}** is already **#${position}** in the queue, ${member}. You can request something else. :wink:`);
+			this.log(`Track "${track.title}" not added: exists in the queue with the same ID.`);
+			return;
+		}
 
 		// User without permissions attempts to play livestream.
 		if (track.isLivestream && !hasPermissions) {
-			this.lastTextChannel.send("Sorry <@" + member.id + ">, you don't have permissions to add livestreams. :point_up:");
-			this.log("Track " + track.title + " not added: no permission to play livestream.");
+			if (!isSilent) this.lastTextChannel.send(`Sorry ${member}, you don't have permissions to add livestreams. :point_up:`);
+			this.log(`Track "${track.title}" not added: no permission to play livestream.`);
 			return;
 		}
 
@@ -309,61 +368,201 @@ class Guild {
 		const maxDuration = this.getSetting("max-duration");
 
 		if (!hasPermissions && maxDuration > 0 && track.duration > maxDuration) {
-			this.lastTextChannel.send("Sorry <@" + member.id + ">, **" + track.title + "** is too long! (" + Track.timeToText(track.duration) + "/" + Track.timeToText(maxDuration) + ") :rolling_eyes:");
-			this.log("Track " + url + " not added: too long (" + track.duration + "/" + maxDuration + ").");
+			if (!isSilent) this.lastTextChannel.send(`Sorry ${member}, **${track.title}** is too long! (${Track.timeToText(track.duration)} / ${Track.timeToText(maxDuration)}) :rolling_eyes:`);
+			this.log(`Track "${track.title}" not added: too long (${track.duration} / ${maxDuration}).`);
 			return;
 		}
 
 		// DES-PA-CITO.
 		if (track.title && track.title.match(/despacito/i)) {
-			this.lastTextChannel.send("Anything related to \"Despacito\" is FUCKING BLACKLISTED. :middle_finger:");
-			this.log("Track " + url + " not added: blacklisted.");
+			if (!isSilent) this.lastTextChannel.send("Anything related to \"Despacito\" is FUCKING BLACKLISTED. :middle_finger:");
+			this.log(`Track "${track.title}" not added: blacklisted.`);
 			return;
 		}
 
 		this.log("Track successfully added: " + track.title);
 
 		// Queue new track.
-		if (isNext === true && hasPermissions) {
-			if (isNow === true) this.lastTextChannel.send("Okay <@" + member.id + ">, let's play it right now! :smirk:");
-			this.tracksQueue.unshift(track);
+		if (isNext && hasPermissions) {
+			if (isNow) this.lastTextChannel.send(`Okay ${member}, let's play it right now! :smirk:`);
 			this.log("Track is forced next in the queue.");
+
+			this.tracksQueue.unshift(track);
+			this.uniqueTracks.unshift(track.uniqueID);
 		}
 
 		// No permissions to insert at the beginning of the queue.
 		else {
-			if (isNext === true) this.lastTextChannel.send("Sorry <@" + member.id + ">, you can't queue track next, nor play it immediately. :rolling_eyes:");
+			if (isNext) this.lastTextChannel.send(`Sorry ${member}, you can't queue track next, nor play it immediately. :rolling_eyes:`);
+
 			this.tracksQueue.push(track);
+			this.uniqueTracks.push(track.uniqueID);
 		}
 
 		// Create a new voice connection, if there is none.
 		if (this.voiceConnection === undefined) {
+			/*
 			member.voiceChannel.join().then(connection => {
 				this.voiceConnection = connection;
-				this.voiceConnection.on("disconnect", () => {
+				this.playNextTrack();
+				this.log("Created new voice connection.");
+				
+				connection.on("disconnect", () => {
 					this.voiceConnection = undefined;
 					this.log("Disconnected from voice.");
 				});
 
+				connection.on("failed", error => {
+					console.log(error);
+				});
+
+				connection.on("error", error => {
+					console.log(error);
+				});
+			})
+			.catch(error => {
+				console.log(error);
+			});
+			*/
+
+			// Workaround for the instant skip problem.
+			member.voiceChannel.join();
+			this.voiceConnection = this.guild.voiceConnection;
+
+			this.voiceConnection.on("ready", () => {
 				this.playNextTrack();
 				this.log("Created new voice connection.");
+			});
+				
+			this.voiceConnection.on("disconnect", () => {
+				this.voiceConnection = undefined;
+				this.log("Disconnected from voice.");
+			});
+
+			this.voiceConnection.on("error", error => {
+				console.log(error);
 			});
 		}
 
 		// Somehow we are in a voice channel, but nothing is being played.
-		else if (!this.currentTrack) this.playNextTrack();
+		// else if (!this.currentTrack) this.playNextTrack();
 
 		// Play the track right now.
-		else if (isNow === true && hasPermissions && this.voiceDispatcher) {
+		else if (options && options.isNow === true && hasPermissions && this.voiceDispatcher) {
 			this.voiceDispatcher.end();
 			this.log("Skipping directly to the requested track.");
 		}
 		
 		// Show queue message.
-		else {
+		else if (!isSilent) {
 			var position = this.tracksQueue.indexOf(track) + 1;
-			this.lastTextChannel.send("<@" + member.id + ">, your track is **#" + position + "** in the queue:", track.embed);
+			this.lastTextChannel.send(`${member}, your track is **#${position}** in the queue:`, track.embed);
 		}
+	}
+
+	/**
+	 * Load videos of a YouTube playlist as tracks.
+	 *
+	 * @param {string} playlistID - The YouTube playlist ID.
+	 * @param {GuildMember} member - Member, who started adds the playlist.
+	 * @returns {Promise<number>} A promise with number of tracks in playlist.
+	 */
+	loadPlaylist(playlistID, member) {
+		return new Promise((resolve, reject) => {
+			// Can't search in YouTube: API token not provided.
+			if (!this.galaxybot.isYouTubeAvailable) {
+				reject("yt unavailable");
+				return;
+			}
+
+			const maxResults = this.galaxybot.config.youtube.maxplaylist;
+			const options = { maxResults: (maxResults > 0 ? maxResults : 0) };
+
+			yt_playlist(this.galaxybot.config.youtube.token, playlistID, options).then(items => {
+				this.log("Found " + items.length + " tracks in playlist " + playlistID);
+
+				for (var i = 0; i < items.length; i++) {
+					const videoURL = "https://www.youtube.com/watch?v=" + items[i].resourceId.videoId;
+					const delay = i * 100;
+
+					this.pendingTimers.push(setTimeout(() => {
+						var track = new Track(videoURL, member, track => {
+							this.onTrackCreated(track, member, videoURL, { silent: true });
+						});
+					}, delay));
+				}
+
+				resolve(items.length);
+			}).catch(error => {
+				console.log(error);
+				reject("playlist error");
+			});
+		});
+	}
+
+	/**
+	 * Search for a video or a playlist in YouTube and add first result.
+	 *
+	 * @param {string} query - The YouTube search query.
+	 * @param {GuildMember} member - Member, who started the search.
+	 * @returns {Promise<number>} A promise with number of tracks in playlist, 0 if a single video.
+	 */
+	searchYouTube(query, member) {
+		return new Promise((resolve, reject) => {
+			// Query is too short.
+			if (typeof query !== "string" || query.length <= 0) {
+				reject("bad query");
+				return;
+			}
+
+			// Can't search in YouTube: API token not provided.
+			if (!this.galaxybot.isYouTubeAvailable) {
+				reject("yt unavailable");
+				return;
+			}
+
+			var options = {
+				maxResults: 10,
+				key: this.galaxybot.config.youtube.token
+			};
+
+			yt_search(query, options, (error, results) => {
+				if (error) {
+					console.log(error);
+					reject("search error");
+					return;
+				}
+
+				var hasResult = false;
+
+				// Iterate the results.
+				for (const result of results) {
+					// Play first found video.
+					if (result.kind === "youtube#video") {
+						var track = new Track(result.link, member, track => {
+							this.onTrackCreated(track, member, result.link);
+						});
+
+						resolve(0);
+						break;
+					}
+
+					// Add first found playlist.
+					else if (result.kind === "youtube#playlist") {
+						this.loadPlaylist(result.id, member).then(nbItems => {
+							resolve(nbItems);
+						}).catch(error => {
+							reject(error);
+						});
+
+						hasResult = true;
+						break;
+					}
+				}
+
+				if (!hasResult) reject("no results");
+			});
+		});
 	}
 
 	/**
@@ -413,6 +612,63 @@ class Guild {
 		.catch(error => {
 			console.log(error);
 		});
+	}
+
+	/**
+	 * Find occurences of the filtered words in a string.
+	 *
+	 * @param {String} content - The string to find occurences in.
+	 * @param {Array} words - The array of words to find.
+	 * @returns {Array} The array of words found.
+	 */
+	findFilteredWords(content, words) {
+		if (typeof content !== "string" || !Array.isArray(words) || words.length <= 0) return [];
+
+		var matchingWords = [];
+
+		// Lowercase the content.
+		const lowercaseContent = content.toLowerCase();
+
+		for (var i = 0; i < words.length; i++) {
+			const word = words[i].toLowerCase();
+			if (!lowercaseContent.match(word) || matchingWords.indexOf(word) >= 0) continue;
+			matchingWords.push(word);
+		}
+
+		return matchingWords;
+	}
+
+	/**
+	 * Look for filtered words in a message and delete on match.
+	 *
+	 * @param {Message} message - The message sent.
+	 * @returns {Boolean} `true` if the message was deleted.
+	 */
+	filterMessage(message) {
+		if (!message || message.guild != this.guild || !message.deletable || message.author.id == this.galaxybot.client.id) return false;
+
+		// Filter disabled.
+		if (this.getSetting("enable-filter") !== true) return false;
+
+		// Ignore admins.
+		if (this.getSetting("filter-admins") !== true && this.isGalaxyBotManager(message.member)) return false;
+
+		// Get filtered words list.
+		const filteredWords = this.getSetting("filtered-words");
+		const matchingWords = this.findFilteredWords(message.content, filteredWords);
+		
+		// Delete the message
+		if (matchingWords.length > 0) {
+			message.delete().then(() => {
+				this.log(`Deleted ${message.author.tag} message containing filtered phrases: ${matchingWords.join(", ")}.`);
+				return true;
+			})
+			.catch(error => {
+				this.log("Couldn't filter out a message: missing permissions.");
+				// console.log(error);
+				return false;
+			});
+		}
 	}
 
 	/**
@@ -522,17 +778,23 @@ class Guild {
 						var targetChannel = this.guild.channels.get(settingValue);
 
 						if (targetChannel !== undefined) {
-							settingValue = targetChannel;
+							settingValue = targetChannel.id;
 						} else {
 							settingValue = undefined;
 						}
+
+						break;
 					}
 
 					// Roles with permissions to manage GalaxyBot.
 					case "roles" : {
+						function escape(string) {
+							return string.replace(/[-\/\\^$*+?.()|[\]{}]/g, "\\$&");
+						};
+
 						var explode = settingValue.split(" ");
 						const action = explode.shift();
-						const expression = new RegExp(explode.join(" "), "i");
+						const expression = new RegExp(escape(explode.join(" ")), "i");
 
 						var targetRole;
 						var currentRoles = this.settings.roles ? this.settings.roles : [];
@@ -546,7 +808,7 @@ class Guild {
 						currentRoles = currentRoles.filter(snowflake => this.guild.roles.has(snowflake));
 
 						// Incorrect action given.
-						if (!action.match(/add|remove/)) {
+						if (!action.match(/^add|remove$/)) {
 							reject("incorrect action");
 							return;
 						}
@@ -559,7 +821,9 @@ class Guild {
 
 						// Role is highest user role, or even higher.
 						if (!this.isAdministrator(member) && member.id != this.galaxybot.config.dommy) {
-							if (member.highestRole === false || targetRole.calculatedPosition <= member.highestRole.calculatedPosition) {
+							console.log(targetRole.calculatedPosition);
+							console.log(member.highestRole.calculatedPosition);
+							if (targetRole.calculatedPosition >= member.highestRole.calculatedPosition) {
 								reject("higher role");
 								return;
 							}
@@ -618,7 +882,7 @@ class Guild {
 						currentChannels = currentChannels.filter(snowflake => this.guild.channels.has(snowflake));
 
 						// Incorrect action given.
-						if (!action.match(/add|remove/)) {
+						if (!action.match(/^add|remove$/)) {
 							reject("incorrect action");
 							return;
 						}
@@ -666,7 +930,7 @@ class Guild {
 					// Word filter.
 					case "filtered-words" : {
 						// Look for invalid configuration.
-						if (!this.config.filter || isNaN(this.config.filter.min) || isNaN(this.config.filter.max) || isNaN(this.config.filter.count)) {
+						if (!this.galaxybot.config.filter || isNaN(this.galaxybot.config.filter.min) || isNaN(this.galaxybot.config.filter.max) || isNaN(this.galaxybot.config.filter.count)) {
 							message.channel.send("Words filter configuration is invalid. Please contact the GalaxyBot owner!");
 							reject("bad filter config");
 							return;
@@ -679,7 +943,7 @@ class Guild {
 						var currentWords = this.settings[settingName] ? this.settings[settingName] : [];
 
 						// Incorrect action given.
-						if (!action.match(/add|remove/)) {
+						if (!action.match(/^add|remove$/)) {
 							reject("incorrect action");
 							return;
 						}
@@ -691,13 +955,13 @@ class Guild {
 								return;
 							}
 
-							if (currentWords.length >= this.config.filter.count) {
+							if (currentWords.length >= this.galaxybot.config.filter.count) {
 								reject("too many words");
 								return;
 							}
 
 							// Word too short or too long.
-							if (word.length < this.config.filter.min || word.length > this.config.filter.max) {
+							if (targetWord.length < this.galaxybot.config.filter.min || targetWord.length > this.galaxybot.config.filter.max) {
 								reject("word length");
 								return;
 							}
@@ -727,11 +991,14 @@ class Guild {
 
 				// Delete the property, if matches the default value.
 				if (settingValue === defaultValue) {
-					delete this.settings;
+					delete this.settings[settingName];
 				}
 
 				// Set new value.
-				else this.settings[settingName] = settingValue;
+				else {
+					if (typeof this.settings !== "object") this.settings = new Object();
+					this.settings[settingName] = settingValue;
+				}
 
 				// Save settings to a file.
 				savedToFile = this.saveSettings();
@@ -744,7 +1011,7 @@ class Guild {
 			}
 
 			// Get the current value. If not set, take the default value.
-			var currentValue = this.settings[settingName] !== undefined ? this.settings[settingName] : defaultValue;
+			var currentValue = this.settings && this.settings[settingName] !== undefined ? this.settings[settingName] : defaultValue;
 
 			// Format values of some settings into a readable form.
 			if (currentValue !== undefined) { 

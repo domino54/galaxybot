@@ -7,7 +7,7 @@ module.exports = {
 	execute: command => {
 		// No permissions to change the setting.
 		if (!command.botGuild.isGalaxyBotManager(command.member)) {
-			command.channel.send("Sorry <@" + command.user.id + ">, you don't have permissions to edit my settings. :no_entry:");
+			command.channel.send(`Sorry ${command.user}, you don't have permissions to edit my settings. :no_entry:`);
 			command.botGuild.log("No permissions to limit music access.");
 			return;
 		}
@@ -24,7 +24,7 @@ module.exports = {
 				rolesText = " and members with one of following roles: " + rolesList.join(", ");
 			}
 
-			command.channel.send("Sure <@" + command.user.id + ">, from now on I will respond only to the music player commands sent by the server administrators" + rolesText + ". :ok_hand:");
+			command.channel.send(`Sure ${command.user}, from now on I will respond only to the music player commands sent by the server administrators${rolesText}. :ok_hand:`);
 		}
 
 		// Disable the ristriction.

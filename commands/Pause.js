@@ -8,14 +8,14 @@ module.exports = {
 	execute: command => {
 		// No permissions.
 		if (!command.botGuild.isGalaxyBotManager(command.member)) {
-			command.channel.send("Sorry <@" + command.user.id + ">, but you don't have permissions to pause/resume the music player. :point_up:");
+			command.channel.send(`Sorry ${command.user}, but you don't have permissions to pause/resume the music player. :point_up:`);
 			command.botGuild.log("No permissions to pause/resume music player.");
 			return;
 		}
 
 		// Nothing is being played.
 		if (!command.botGuild.voiceDispatcher) {
-			command.channel.send("Looks like I'm not playing anything right now, <@" + command.user.id + ">. :shrug:");
+			command.channel.send(`Looks like I'm not playing anything right now, ${command.user}. :shrug:`);
 			command.botGuild.log("Nothing is being played.");
 			return;
 		}

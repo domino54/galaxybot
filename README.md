@@ -9,17 +9,23 @@ Reference: `command <mandatory> [optional]`.
 
 ### General
 
+| Command          | Description |
+|:----------------:| ----------- |
+| `about`          | Shows some details about the GalaxyBot.
+| `help [command]` | Sends a link to the commands reference or a description of the given command.
+| `dommy`          | Mention [`Dommy#7014`](https://github.com/domino54/) with a thinking GIF. 🤔
+| `git`            | Sends a link to the GitHub repository with source code of the GalaxyBot.
+| `invite`         | Sends a link, which allows the user to add GalaxyBot to their server.
+| `guilds`         | The number of guilds GalaxyBot is active in. Full list featuring guilds names is available only to the bot owner, through a direct message.
+| `avatar [name]`  | Sends you direct link to your or someone's avatar.
+| `time`           | Current time of the machine GalaxyBot is running on.
+
+### Moderation
+
 | Command                   | Description |
 |:-------------------------:| ----------- |
-| `about`                   | Shows some details about the GalaxyBot.
-| `help [command]`          | Sends a link to the commands reference or a description of the given command.
-| `dommy`                   | Mention [`Dommy#7014`](https://github.com/domino54/) with a thinking GIF. 🤔
-| `git`                     | Sends a link to the GitHub repository with source code of the GalaxyBot.
-| `invite`                  | Sends a link, which allows the user to add GalaxyBot to their server.
-| `guilds`                  | The number of guilds GalaxyBot is active in. Full list featuring guilds names is available only to the bot owner, through a direct message.
-| `avatar [name]`           | Sends you direct link to your or someone's avatar.
 | `settings <name> [value]` | Manage the GalaxyBot settings in the server. Anyone can view the bot settings, however only the GalaxyBot managers can edit them. See the [settings list](#Settings) below for more information.
-| `time`                    | Current time of the machine GalaxyBot is running on.
+| `purge <count> [user]`    | Removes up to 100 messages in current text channel. Requires both the sender and GalaxyBot to have **Manage messages** permissions in the channel. `user` can be specified to delete messages of a specific user.
 
 ### ManiaPlanet
 
@@ -43,9 +49,10 @@ Instead of using title `id` in commands you can use one of following short codes
 
 | Command                         | Description |
 |:-------------------------------:| ----------- |
-| `play <url\|query> [now\|next]` | Connects to a voice channel and plays audio from the given link. If an invalid URL is given, GalaxyBot will search the phrase in YouTube and play the first playable result. `now` and `next` allow GalaxyBot managers to play the track instantly or insert it at the beginning of the queue. If an audio file is attached to the message, GalaxyBot will attempt to play it.
+| `play <url\|query> [now\|next]` | Connects to a voice channel and plays audio from the given link. You can request videos from YouTube, Facebook and Streamable, send direct link to a file or a YouTube playlist. If an invalid URL is given, GalaxyBot will search the phrase in YouTube and play the first playable result. `now` and `next` allow GalaxyBot managers to play the track instantly or insert it at the beginning of the queue. If an audio file is attached to the message, GalaxyBot will attempt to play it.
 | `playattachment [#] [channel]`  | Puts the latest audio file attachment sent in the channel in the queue. `#` can be used to determine which attachment should be played. Adding the `channel` parameter will search for an attachment in this particular channel.
-| `undo`                          | Removes the latest track you've requested.
+| `youtube <query>`               | Search for a YouTube video or playlist and add it to the music player queue.
+| `undo [quantity\|all]`          | Removes the latest track you've requested. Specify `quantity` to remove a certain number of tracks, or `all` to remove all your requests.
 | `now`                           | Shows what is currently being played.
 | `next [me\|order]`              | Shows details of the next track in the queue. `me` shows upcoming song requested by you. `order` can tell which track is at specific position in the queue.
 | `queue`                         | Lists up to 10 upcoming entries in the music player queue. `me` can be used to list upcoming tracks requested by you.

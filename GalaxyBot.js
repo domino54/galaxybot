@@ -1,6 +1,5 @@
 // Dependencies.
 const Discord = require("discord.js");
-const yt_search = require("youtube-search");
 const querystring = require("querystring");
 const yaml = require("js-yaml");
 const FB = require("fb");
@@ -42,6 +41,7 @@ class GalaxyBot {
 		process.on("SIGBREAK", () => { this.end(); });
 
 		this.config = null;
+		this.isYouTubeAvailable = false;
 		this.activeGuilds = new Map();
 		this.activeUsers = new Map();
 		this.availableCommands = new Map();
@@ -106,6 +106,9 @@ class GalaxyBot {
 			return;
 		}
 
+		// Check if YouTube token is available.
+		this.isYouTubeAvailable = this.config.youtube && this.config.youtube.token;
+
 		// Initialize logs.
 		if (typeof(this.config.logfile) === "string") {
 			this.logsStream = fs.createWriteStream(this.config.logfile, { flags: "a" });
@@ -158,7 +161,7 @@ class GalaxyBot {
 		this.client.guilds.forEach((guild, guildId) => {
 			var guild = this.getGalaxyBotGuild(guild);
 		});
-		this.log(false, "Active in " + this.activeGuilds.size + " guilds.");
+		this.log(false, `Active in ${this.activeGuilds.size} guilds.`);
 
 		// Update ManiaPlanet servers statuses.
 		this.updateServersStatuses();
@@ -249,14 +252,14 @@ class GalaxyBot {
 		if (!this.availableCommands.has(command.name)) return;
 
 		// Log command.
-		command.botGuild.log("Command sent by " + command.user.tag + ": " + command.name);
+		command.botGuild.log(`Command "${command.name}" sent by ${command.user.tag}.`);
 
 		// Get the command model.
 		const commandModel = this.availableCommands.get(command.name);
 
 		// Command is available only on servers.
 		if (commandModel.serverOnly === true && command.botGuild.type != "guild") {
-			command.channel.send("Sorry <@" + command.user.id + ">, this command is available only on servers!");
+			command.channel.send(`Sorry ${command.user}, this command is available only on servers!`);
 			command.botGuild.log("Command is available only in guilds.");
 			return;
 		}
@@ -273,8 +276,8 @@ class GalaxyBot {
 					channelsTags.push("<#" + channelId + ">");
 				}
 
-				command.channel.send("You can't use music player commands in this channel, <@" + command.user.id + ">. Try in " + channelsTags.join(", ") + "!");
-				command.botGuild.log("Music commands not allowed in #" + command.channel.name + ".");
+				command.channel.send(`You can't use music player commands in this channel, ${command.user}. Try in ${channelsTags.join(", ")}!`);
+				command.botGuild.log(`Music commands not allowed in #${command.channel.name}.`);
 				return;
 			}
 
@@ -283,7 +286,7 @@ class GalaxyBot {
 		}
 
 		// Music player access is currently restricted.
-		if (commandModel.limitedAccess === true && !command.botGuild.isGalaxyBotManager(command.member)) {
+		if (commandModel.limitedAccess === true && command.botGuild.isPlayerLimitedAccess() && !command.botGuild.isGalaxyBotManager(command.member)) {
 			const rolesList = command.botGuild.createRolesList();
 			var rolesText = "";
 
@@ -291,13 +294,20 @@ class GalaxyBot {
 				rolesText = " and members with one of following roles: " + rolesList.join(", ");
 			}
 
-			command.channel.send("Sorry <@" + command.user.id + ">, but you can't control the music player right now. I only accept commands from the server administrators" + rolesText + "!");
+			command.channel.send(`Sorry ${command.user}, but you can't control the music player right now. I only accept commands from the server administrators${rolesText}!`);
 			command.botGuild.log("Music player has limited access.");
 			return;
 		}
 
 		// Execute the command.
-		commandModel.execute(command);
+		try {
+			commandModel.execute(command);
+		}
+
+		// Super advanced, 100% working crash prevention for commands.
+		catch (error) {
+			command.channel.send("An error has occured while executing the command. Please contact my creator if this problem persists! ```" + error + "```");
+		}
 	}
 
 	/**
@@ -307,66 +317,6 @@ class GalaxyBot {
 		this.activeGuilds.forEach((guild, guildId) => {
 			guild.updateServersStatuses();
 		});
-	}
-
-	/**
-	 * Find occurences of the filtered words in a string.
-	 *
-	 * @param {String} content - The string to find occurences in.
-	 * @param {Array} words - The array of words to find.
-	 * @returns {Array} The array of words found.
-	 */
-	findFilteredWords(content, words) {
-		if (typeof content !== "string" || !Array.isArray(words) || words.length <= 0) return [];
-
-		var matchingWords = [];
-
-		// Lowercase the content.
-		const lowercaseContent = content.toLowerCase();
-
-		for (var i = 0; i < words.length; i++) {
-			const word = words[i].toLowerCase();
-			if (!lowercaseContent.match(word) || matchingWords.indexOf(word) >= 0) continue;
-			matchingWords.push(word);
-		}
-
-		return matchingWords;
-	}
-
-	/**
-	 * Look for filtered words in a message and delete on match.
-	 *
-	 * @param {Guild} guild - The guild message was sent in.
-	 * @param {Message} message - The message sent.
-	 * @returns {Boolean} `true` if the message was deleted.
-	 */
-	filterMessage(guild, message) {
-		if (!guild || !message || !message.guild || message.author.id == this.client.id) return false;
-
-		// Filter disabled.
-		if (guild.getSetting("enable-filter") !== true) return false;
-
-		// Ignore admins.
-		if (guild.getSetting("filter-admins") !== true && guild.isGalaxyBotManager(message.member)) return false;
-
-		// Get filtered words list.
-		const filteredWords = guild.getSetting("filtered-words");
-		const matchingWords = this.findFilteredWords(message.content, filteredWords);
-		
-		// Delete the message
-		if (matchingWords.length > 0) {
-			const username = message.author.tag;
-
-			message.delete().then(() => {
-				guild.log("Deleted " + username + " message containing filtered phrases: " + matchingWords.join(", "));
-				return true;
-			})
-			.catch(error => {
-				guild.log("Couldn't filter out a message: missing permissions.");
-				// console.log(error);
-				return false;
-			});
-		}
 	}
 
 	/**
@@ -386,7 +336,7 @@ class GalaxyBot {
 
 		// Pineapple does NOT go on pizza.
 		if (message.content.match(/pizza/i) && message.content.match(/pineapple/i)) {
-			guild.log(message.author.tag + " is an idiot, who puts pineapple on their pizza.");
+			guild.log(`${message.author.tag} MIGHT be an idiot, who puts pineapple on their pizza.`);
 			message.reply("I really hope you don't have pineapple on your pizza.");
 		}
 
@@ -398,7 +348,7 @@ class GalaxyBot {
 			// They changed their mind.
 			if (user.empathyBadBot) {
 				switch (user.empathyChangeStreak) {
-					case 0 : { replyContent = "Changed your mind, <@" + message.author.id + ">?"; break; }
+					case 0 : { replyContent = `Changed your mind, ${message.author}?`; break; }
 					case 1 : { replyContent = "I see you're having fun."; break; }
 					default : return;
 				}
@@ -409,8 +359,8 @@ class GalaxyBot {
 			// Reply depending on annoyance level.
 			else {
 				switch (user.annoyanceLevel) {
-					case 0 : { replyContent = "Thank you, <@" + message.author.id + ">! :heart:"; break; }
-					case 1 : { replyContent = "Thanks, <@" + message.author.id + ">!"; break; }
+					case 0 : { replyContent = `Thank you, ${message.author}! :heart:`; break; }
+					case 1 : { replyContent = `Thanks, ${message.author}!`; break; }
 					case 2 : { replyContent = "Thank you."; break; }
 					case 3 : { replyContent = "I get it, okay."; break; }
 					case 4 : { replyContent = "You're so annoying..."; break; }
@@ -440,7 +390,7 @@ class GalaxyBot {
 			// They changed their mind.
 			if (user.empathyGoodBot) {
 				switch (user.empathyChangeStreak) {
-					case 0 : { replyContent = "Changed your mind, <@" + message.author.id + ">?"; break; }
+					case 0 : { replyContent = `Changed your mind, ${message.author}?`; break; }
 					case 1 : { replyContent = "I see you're having fun."; break; }
 					default : return;
 				}
@@ -452,7 +402,7 @@ class GalaxyBot {
 			else {
 				switch (user.annoyanceLevel) {
 					case 0 : {
-						replyContent = "Am I supposed to cry now, <@" + message.author.id + ">?";
+						replyContent = `Am I supposed to cry now, ${message.author}?`;
 						user.askedToCryChannel = message.channel.id;
 						break;
 					}
@@ -477,8 +427,8 @@ class GalaxyBot {
 		// I asked them if I should cry.
 		else if (user.askedToCryChannel !== false) {
 			if (message.content.match(/yes/i) && message.channel.id == user.askedToCryChannel) {
-				message.channel.send("Okay <@" + message.author.id + ">. *Goes to a corner and pretends to cry.*");
-				guild.log(message.author.tag + " wants me to cry.");
+				message.channel.send(`Okay ${message.author}. *Goes to a corner and pretends to cry.*`);
+				gguild.log(`${message.author.tag} wants me to cry.`);
 			}
 
 			user.askedToCryChannel = false;
@@ -486,15 +436,15 @@ class GalaxyBot {
 
 		// The AI is an asshole?
 		else if (message.content.match(/bot/i) && message.content.match(/asshole/i)) {
-			guild.log(message.author.tag + " thinks the AI is an asshole.");
+			guild.log(`${message.author.tag} thinks the AI is an asshole.`);
 			message.channel.send("The AI is an asshole?");
 			user.lowerKarma();
 		}
 
 		// GalaxyBot is annoying. Kinda.
 		else if (message.content.match(new RegExp("(((<@" + this.config.dommy + ">|Dommy).+bots?)|(GalaxyBot|<@" + this.client.id + ">)).+(is|are).+annoying", "i"))) {
-			guild.log(message.author.tag + " thinks I'm annoying.");
-			message.channel.send("<@" + message.author.id + "> You're annoying.");
+			message.channel.send(`${message.author} You're annoying.`);
+			guild.log(`${message.author.tag} thinks I'm annoying.`);
 			user.lowerKarma();
 		}
 
@@ -519,15 +469,15 @@ class GalaxyBot {
 		const guild = botGuild ? botGuild : botUser;
 		
 		// Delete messages with filtered words.
-		if (this.filterMessage(guild, message)) return;
+		if (message.guild && guild.filterMessage(message)) return;
 
-		const commandPrefix = guild.getSetting("prefix");
-		const isCommand = message.content.startsWith(commandPrefix);
+		const prefix = guild.getSetting("prefix");
+		const isCommand = message.content.startsWith(prefix);
 		
 		// Send command to commands handler.
 		if (isCommand) {
 			const commandArguments = message.content.split(" ");
-			const commandName = commandArguments.shift().replace(commandPrefix, "").toLowerCase();
+			const commandName = commandArguments.shift().replace(prefix, "").toLowerCase();
 
 			this.onCommand(new PendingCommand(this, botGuild, botUser, commandName, commandArguments, message));
 			return;
@@ -538,8 +488,8 @@ class GalaxyBot {
 
 		// If bot is mentioned, send information about help command.
 		if (message.isMentioned(this.client.user.id)) {
-			message.channel.send("<@" + message.author.id + ">, need help with anything? Type **" + commandPrefix + "help** to see my commands! :raised_hands:");
-			guild.log("GalaxyBot mentioned by " + message.author.tag);
+			message.channel.send(`${message.author}, need help with anything? Type **${prefix}help** to see my commands! :raised_hands:`);
+			guild.log(`GalaxyBot mentioned by ${message.author.tag}`);
 		}
 
 		// Check if message contains something about ManiaPlanet.
@@ -551,14 +501,14 @@ class GalaxyBot {
 				for (const link of foundTitles) {
 					const titleUid = link.split("/").pop();
 
-					guild.log("ManiaPlanet title link detected: " + titleUid);
+					guild.log(`Detected ManiaPlanet title: "${titleUid}".`);
 					
 					// Download the title information.
 					ManiaPlanet.title(titleUid, titleInfo => {
 						if (!titleInfo || titleInfo.code == 404) return;
 						
 						message.channel.send(ManiaPlanet.createTitleEmbed(titleInfo));
-						guild.log("Successfully sent title info: " + ManiaPlanet.stripFormatting(titleInfo.name));
+						guild.log(`Successfully sent ${ManiaPlanet.stripFormatting(titleInfo.name)} info.`);
 					});
 				}
 			}
@@ -570,14 +520,14 @@ class GalaxyBot {
 				for (const link of foundMaps) {
 					const mapUid = link.split("/").pop();
 
-					guild.log("ManiaPlanet map link detected: " + mapUid);
+					guild.log(`Detected ManiaPlanet map: "${mapUid}".`);
 					
 					// Download the map information.
 					ManiaPlanet.map(mapUid, mapInfo => {
 						if (!mapInfo || mapInfo.code == 404) return;
 						
 						message.channel.send(ManiaPlanet.createMapEmbed(mapInfo));
-						guild.log("Successfully sent map info: " + ManiaPlanet.stripFormatting(mapInfo.name));
+						guild.log(`Successfully sent ${ManiaPlanet.stripFormatting(mapInfo.name)} info.`);
 					});
 				}
 			}
@@ -591,38 +541,38 @@ class GalaxyBot {
 				const mxid = link.split("/").pop();
 				const site = link.substring(0, 2);
 
-				guild.log("Mania Exchange link detected: " + site + " " + mxid);
+				guild.log(`Detected Mania Exchange map: "${mapUid}" in ${site}.`);
 				
 				ManiaExchange.maps(site, [mxid], mapInfo => {
 					if (!mapInfo || mapInfo.length <= 0) return;
 
 					message.channel.send(ManiaExchange.createMapEmbed(mapInfo[0]));
-					guild.log("Successfully sent Mania Exchange map info: " + mapInfo[0].Name);
+					guild.log(`Successfully sent ${mapInfo[0].Name} info.`);
 				});
 			}
 		}
 
 		// React with Joy.
 		if (message.content.match(/😂|😹/i) && guild.getSetting("mocking-joy") === true) {
-			guild.log(message.author.tag + " is using cancerous emoji.");
+			guild.log(`${message.author.tag} is using cancerous emoji.`);
 			message.react("yoy:398111076379525141");
-			user.lowerKarma();
+			botUser.lowerKarma();
 
 			// Enough?
-			if (user.annoyanceLevel >= 3 && !user.warnedForJoyEmoji) {
-				message.channel.send("Stop using this cancerous \"joy\" emoji <@" + message.author.id + ">, for fucks sake.");
-				user.warnedForJoyEmoji = true;
+			if (botUser.annoyanceLevel >= 3 && !botUser.warnedForJoyEmoji) {
+				message.channel.send(`Stop using this cancerous "joy" emoji ${message.author}, for fucks sake.`);
+				botUser.warnedForJoyEmoji = true;
 			}
 
 			// Reset counter
-			if (user.warnedForJoyEmoji && user.annoyanceLevel < 3) {
-				user.warnedForJoyEmoji = false;
+			if (botUser.warnedForJoyEmoji && botUser.annoyanceLevel < 3) {
+				botUser.warnedForJoyEmoji = false;
 			}
 		}
 
 		// React with Tomek.
 		if (message.content.match(/tomek/i)) {
-			guild.log(message.author.tag + " is a big fan of Tomek.");
+			guild.log(`${message.author.tag} is a big fan of Tomek.`);
 			message.react("tomkek:400401620078166017");
 		}
 	}
@@ -638,12 +588,12 @@ class GalaxyBot {
 		var guild = this.getGalaxyBotGuild(messageNew.guild);
 
 		// Delete messages with filtered words.
-		if (this.filterMessage(guild, messageNew)) return;
+		if (messageNew.guild && guild.filterMessage(messageNew)) return;
 
 		// Stalk members, who edit their messages.
 		if (guild && guild.getSetting("stalk-edits") && messageOld.content != messageNew.content) {
-			messageOld.channel.send("I see you, <@" + messageOld.author.id + ">: ```" + messageOld.content.replace("`", "") + "```");
-			guild.log(messageOld.author.username + " tried to be sneaky by editing their message.");
+			messageOld.channel.send(`I see you, ${messageOld.author}: \`\`\`${messageOld.content.replace("`", "")}\`\`\``);
+			guild.log(`${message.author.tag} tried to be sneaky by editing their message.`);
 		}
 	}
 
@@ -662,7 +612,7 @@ class GalaxyBot {
 		if (guild.getSetting("enable-filter") === true) {
 			// Get filtered words list.
 			const filteredWords = guild.getSetting("filtered-words");
-			const matchingWords = this.findFilteredWords(reaction.emoji.name, filteredWords);
+			const matchingWords = guild.findFilteredWords(reaction.emoji.name, filteredWords);
 
 			// Find filtered words, if there are any.
 			if (matchingWords.length > 0) {
@@ -680,7 +630,7 @@ class GalaxyBot {
 				if (applyFilter) {
 					reaction.remove(user)
 						.then(() => {
-							guild.log("Deleted " + user.username + " reaction containing filtered phrases: " + matchingWords.join(", "));
+							guild.log(`Deleted ${message.author.tag} reaction containing filtered phrases: ${matchingWords.join(", ")}.`);
 						})
 						.catch(error => {
 							guild.log("Couldn't filter out a reaction: missing permissions.");
@@ -706,7 +656,7 @@ class GalaxyBot {
 		if (guild.getSetting("enable-filter") === true && newMember.nickname != "") {
 			// Get filtered words list.
 			const filteredWords = guild.getSetting("filtered-words");
-			const matchingWords = this.findFilteredWords(newMember.nickname, filteredWords);
+			const matchingWords = guild.findFilteredWords(newMember.nickname, filteredWords);
 
 			// Find filtered words, if there are any.
 			if (matchingWords.length > 0) {
@@ -717,7 +667,7 @@ class GalaxyBot {
 				if (applyFilter) {
 					newMember.setNickname("", "Nickname contains filtered words.")
 						.then(() => {
-							guild.log("Changed " + newMember.user.tag + " name, which contained filtered phrases: " + matchingWords.join(", "));
+							guild.log(`Changed ${newMember.user.tag} name, which contained filtered phrases: ${matchingWords.join(", ")}.`);
 						})
 						.catch(error => {
 							guild.log("Couldn't filter out a nickname: missing permissions.");
@@ -760,7 +710,7 @@ class GalaxyBot {
 		if (!guild) return;
 
 		// We"ve been kicked from the server.
-		this.log("Kicked from guild: " + guild.name);
+		this.log(`Kicked from ${guild.name}.`);
 		if (guild.voiceConnection) guild.voiceConnection.channel.leave();
 		if (guild.voiceDispatcher) guild.voiceDispatcher.end();
 		this.activeGuilds.delete(guild.id);

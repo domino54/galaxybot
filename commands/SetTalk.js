@@ -9,29 +9,23 @@ module.exports = {
 
 		// No channel specified.
 		if (command.arguments.length <= 0) {
-			command.channel.send("Sorry <@" + command.user.id + ">, but you have to give me ID of the channel.");
-			command.botGuild.log("Channel not specified.");
+			command.channel.send(`Sorry ${command.user}, but you have to give me ID of the channel.`);
+			command.botGuild.log(`Channel not specified.`);
 			return;
 		}
 
 		const channelId = command.arguments[0];
-		var targetChannel;
-
-		// Find the channel by its ID.
-		this.activeGuilds.forEach((guild, guildId) => {
-			if (targetChannel !== undefined) return;
-			targetChannel = guild.guild.channels.get(channelId);
-		});
+		const targetChannel = command.galaxybot.client.channels.get(channelId);
 
 		// Channel not found.
 		if (targetChannel === undefined) {
-			command.channel.send("Sorry <@" + command.user.id + ">, but the channel with ID **" + channelId + "** was not found. Make sure the ID is valid and I can access this channel.");
-			command.botGuild.log("Channel not found: " + channelId);
+			command.channel.send(`Sorry ${command.user}, but the channel with ID **${channelId}** was not found. Make sure the ID is valid and I can access this channel.`);
+			command.botGuild.log(`Channel with ID ${channelId} not found.`);
 			return;
 		}
 
 		command.galaxybot.talkChannel = targetChannel;
-		command.channel.send("The talk channel has been set to <#" + channelId + ">.");
-		command.botGuild.log("Talk channel set: #" + targetChannel.name);
+		command.channel.send(`The talk channel has been set to ${targetChannel}.`);
+		command.botGuild.log(`Talk channel set to #${targetChannel.name}.`);
 	}
 }

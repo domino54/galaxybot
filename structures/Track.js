@@ -21,17 +21,22 @@ class Track {
 	 */
 	constructor(url, sender, callback, options) {
 		// Available track properties.
-		this.sender = sender;
 		this.url = url;
-		this.author = false;
+		this.sourceURL = undefined;
+		this.sender = sender;
+		this.senderId = sender.id;
+		this.type = undefined;
+		this.color = 0;
+		this.embed = undefined;
+
 		this.title = "Unknown";
+		this.uniqueID = undefined;
+		this.author = undefined;
 		this.description = "";
-		this.thumbnail = "";
 		this.duration = 0;
-		this.color = 0x000000;
+		this.thumbnail = "";
 		this.isLivestream = false;
 		this.isLocalFile = false;
-		this.embed = null;
 
 		// YouTube
 		if (url.match(/https?:\/\/(www\.)?(youtube\.com\/(watch\?v=|embed\/)|youtu\.be\/)[\w-]{11}/i)) this.loadYouTube(callback);
@@ -59,9 +64,10 @@ class Track {
 	 */
 	loadLocalFile(callback) {
 		this.sourceURL = this.url;
+		this.type = "offline";
 		this.title = this.url.split(/\/|\\/).pop();
 		this.isLocalFile = true;
-		this.url = false;
+		this.url = undefined;
 
 		// Check if we can access the file.
 		fs.access(this.sourceURL, fs.constants.R_OK, fserror => {
@@ -82,8 +88,11 @@ class Track {
 				if (metadata.common.artists) artistName = metadata.common.artists.join(", ");
 				if (artistName !== false) this.title = artistName + " - " + this.title;
 
+				// File information.
 				this.title = this.constructor.escapeMentions(this.title);
 				this.duration = metadata.format.duration;
+
+				// Create embed.
 				this.embed = this.createEmbed();
 
 				callback(this);
@@ -106,32 +115,25 @@ class Track {
 				return;
 			}
 
-			// Create stream.
-			try {
-				this.stream = ytdl(this.url, (info.live_playback ? null : { filter: "audioonly" }));
-				this.stream.on("info", info => {
-					callback(this);
-				});
-			}
-			catch (exception) {
-				console.log(exception);
-				callback("yt-stream-fail");
-				return;
-			}
-
 			// Video information.
+			this.type = "youtube";
+			this.title = this.constructor.escapeMentions(info.title);
+			this.uniqueID = info.video_id;
 			this.author = {
 				name: info.author.name,
 				url: info.author.user_url,
 				icon_url: info.author.avatar
 			}
-			this.title = this.constructor.escapeMentions(info.title);
 			this.description = info.description;
-			this.thumbnail = "http://img.youtube.com/vi/" + info.video_id + "/mqdefault.jpg";;
 			this.duration = info.length_seconds;
-			this.color = 0xCC181E;
-			this.isLivestream = info.live_playback;
+			this.thumbnail = "http://img.youtube.com/vi/" + info.video_id + "/mqdefault.jpg";
+			this.isLivestream = info.livestream;
+
+			// Create embed.
+			this.color = 0xFF0000;
 			this.embed = this.createEmbed();
+
+			callback(this);
 		});
 	}
 
@@ -141,28 +143,33 @@ class Track {
 	 * @param {Function} callback - Function to call when Facebook info is obtained.
 	 */
 	loadFacebook(callback) {
-		var temp = this.url.match(/\/videos\/[0-9]+/)[0];
-		var explode = temp.split("/");
-		var videoId = explode.pop();
+		const temp = this.url.match(/\/videos\/[0-9]+/)[0];
+		const explode = temp.split("/");
+		const videoID = explode.pop();
 
-		FB.api("/"+videoId, { fields: ["source", "length", "from", "title", "picture", "live_status"] }, response => {
+		FB.api("/" + videoID, { fields: ["source", "length", "from", "title", "picture", "live_status"] }, response => {
 			if (!response || response.error) {
 				console.log(!response ? "Facebook: Error occurred while getting track info." : response.error);
 				callback("fb-no-info");
 				return;
 			}
-			
+
+			// Video information.
+			this.type = "facebook";
+			this.sourceURL = response.source;
+			this.title = this.constructor.escapeMentions(response.title);
+			this.uniqueID = videoID;
 			this.author = {
 				name: response.from.name,
 				url: "https://www.facebook.com/" + response.from.id,
 				icon_url: "http://graph.facebook.com/" + response.from.id + "/picture?type=normal"
 			};
-			this.sourceURL = response.source;
-			this.title = this.constructor.escapeMentions(response.title);
-			this.thumbnail = response.picture;
 			this.duration = response.length;
-			this.color = 0x4267B2;
+			this.thumbnail = response.picture;
 			this.isLivestream = response.live_status;
+
+			// Create embed.
+			this.color = 0x3B5998;
 			this.embed = this.createEmbed();
 
 			callback(this);
@@ -175,30 +182,36 @@ class Track {
 	 * @param {Function} callback - Function to call when Streamable info is obtained.
 	 */
 	loadStreamable(callback) {
-		var explode = this.url.split("/");
-		var videoURL = "https://api.streamable.com/videos/" + explode.pop();
+		const explode = this.url.split("/");
+		const videoID = explode.pop();
+		const videoURL = "https://api.streamable.com/videos/" + videoID;
 		
 		HTTPS.get(videoURL, response => {
 			var body = "";
 			response.on("data", (data) => { body += data; })
 			response.on("end", () => {
 				try {
-					var info = JSON.parse(body);
+					const info = JSON.parse(body);
 					if (!info.files["mp4-mobile"]) {
 						callback(undefined);
 						return;
 					}
-					var file = info.files["mp4-mobile"];
+					const file = info.files["mp4-mobile"];
 
+					// Video information.
+					this.type = "streamable";
+					this.sourceURL = "https:" + file.url;
+					this.title = this.constructor.escapeMentions(info.title);
+					this.uniqueID = videoID;
 					this.author = {
 						name: "Streamable",
 						url: "https://streamable.com/",
 						icon_url: "https://pbs.twimg.com/profile_images/601124726832955393/GYp5MlPf_400x400.png"
 					};
-					this.sourceURL = "https:" + file.url;
-					this.title = this.constructor.escapeMentions(info.title);
-					this.thumbnail = "https:" + info.thumbnail_url;
 					this.duration = file.duration;
+					this.thumbnail = "https:" + info.thumbnail_url;
+
+					// Create embed.
 					this.color = 0x0F90FA;
 					this.embed = this.createEmbed();
 
@@ -222,9 +235,13 @@ class Track {
 			return;
 		}
 
+		// Track information.
+		this.type = "online";
 		this.sourceURL = this.url;
+		this.uniqueID = this.url;
 		this.title = this.url.split("/").pop().replace(/_/g, " ");
-		this.color = 0x1A96CA;
+		
+		// Create embed.
 		this.embed = this.createEmbed();
 
 		callback(this);
@@ -283,13 +300,13 @@ class Track {
 		}
 
 		// Color only if not black.
-		if (this.color != 0x000000) embed.color = this.color;
+		if (this.color > 0) embed.color = this.color;
 
 		// Embed author if exists.
-		if (this.author !== false) embed.author = this.author;
+		if (this.author) embed.author = this.author;
 
 		// URL only if valid.
-		if (this.url !== false) embed.url = this.url;
+		if (this.url) embed.url = this.url;
 
 		return new Discord.RichEmbed(embed);
 	}

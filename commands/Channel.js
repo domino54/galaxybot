@@ -8,7 +8,7 @@ module.exports = {
 	execute: command => {
 		// Which channel?
 		if (command.arguments.length <= 0) {
-			command.channel.send("Sorry <@" + command.user.id + ">, but I need to know if you want to view `sm` or `tm` channel. :thinking:");
+			command.channel.send(`Sorry ${command.user}, but I need to know if you want to view \`sm\` or \`tm\` channel. :thinking:`);
 			command.botGuild.log("No channel specified.");
 			return;
 		}
@@ -29,23 +29,23 @@ module.exports = {
 			
 			// Unknown channel.
 			default : {
-				message.channel.send("Well, currently we have only two channels - `sm` and `tm`, <@" + command.user.id + ">. :shrug:");
-				command.botGuild.log("Unknown channel: " + channelType);
+				command.channel.send(`Well, currently we have only two channels - \`sm\` and \`tm\`, ${command.user}. :shrug:`);
+				command.botGuild.log(`Unknown channel: ${channelType}.`);
 				return;
 			}
 		}
-
-		command.botGuild.log("Downloading current channel episodes: " + channelId);
 
 		// Get episodes from recent period.
 		var endTime = parseInt(Date.now() / 1000);
 		var startTime = endTime - 9000;
 
+		command.botGuild.log(`Downloading current ${channelId} channel episodes.`);
+
 		ManiaPlanet.episodes(channelId, startTime, endTime, episodes => {
 			// No episodes found.
 			if (!episodes || episodes.code || episodes.length <= 0) {
-				command.channel.send("Looks like there's nothing being played live in this channel right now. Or I ran into some issue again... :thinking:");
-				command.botGuild.log("Channel empty or request error: " + channelId);
+				command.channel.send(`Looks like there's nothing being played live in this channel right now. Or I ran into some issue again... :thinking:`);
+				command.botGuild.log(`Channel ${channelId} empty or request error.`);
 				return;
 			}
 
@@ -55,8 +55,8 @@ module.exports = {
 			ManiaPlanet.title(program.title_uid, titleInfo => {
 				// Title not found.
 				if (!titleInfo || titleInfo.code == 404) {
-					command.channel.send("Sorry, I can't recognize the **" + titleUid + "** title... :shrug:");
-					command.botGuild.log("Title not found: " + titleUid);
+					command.channel.send(`Sorry ${command.user}, I can't recognize the **${titleUid}** title... :shrug:`);
+					command.botGuild.log(`Title "${titleUid}" not found.`);
 					return;
 				}
 
@@ -93,7 +93,7 @@ module.exports = {
 						}]
 					}));
 
-					command.botGuild.log("Successfully sent current program: " + programName);
+					command.botGuild.log(`Successfully sent ${programName} information.`);
 					sentMessage = true;
 				});
 			});

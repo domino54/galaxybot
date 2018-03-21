@@ -1,19 +1,20 @@
-dommy:    99612832353505280
+version:  "0.9.3"
+vdate:    "2018-03-21"
 
-version:  "0.9.0"
-vdate:    "2018-03-18"
+logfile:  log.txt
+github:   https://github.com/domino54/galaxybot
+dommy:    99612832353505280
 
 discord:
   token:  your_token_here
 
 youtube:
-  token:  your_token_here
+  token:        your_token_here
+  maxplaylist:  100
 
 facebook:
   appid:  your_application_id
   secret: your_application_secret
-
-logfile:  log.txt
 
 statuses:
   - "a game"

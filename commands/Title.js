@@ -7,7 +7,7 @@ module.exports = {
 	execute: command => {
 		// Title UID not specified.
 		if (command.arguments.length <= 0) {
-			command.channel.send("Sorry <@" + command.user.id + ">, but you need to specify `UID` of the title you'd like to read about. Provide a valid `UID` in this command or use one of these short codes: " + ManiaPlanet.getTitleCodes().join(", ") + ".");
+			command.channel.send(`Sorry ${command.user}, but you need to specify \`UID\` of the title you'd like to read about. Provide a valid \`UID\` in this command or use one of these short codes: ${ManiaPlanet.getTitleCodes().join(", ")}.`);
 			command.botGuild.log("No title UID specified.");
 			return;
 		}
@@ -15,19 +15,19 @@ module.exports = {
 		// Get the title UID.
 		const titleUid = ManiaPlanet.getTitleUid(command.arguments[0]);
 
-		command.botGuild.log("Downloading title info: " + titleUid);
+		command.botGuild.log(`Downloading "${titleUid}" title information.`);
 
 		// Download the title information.
 		ManiaPlanet.title(titleUid, titleInfo => {
 			// Title not found.
 			if (!titleInfo || titleInfo.code == 404) {
-				command.channel.send("Sorry <@" + command.user.id + "> I can't recognize the **" + titleUid + "** title... :shrug:");
-				command.botGuild.log("Title not found: " + titleUid);
+				command.channel.send(`Sorry ${command.user}, I can't recognize the **${titleUid}** title... :shrug:`);
+				command.botGuild.log(`Title "${titleUid}" not found.`);
 				return;
 			}
 
 			command.channel.send(ManiaPlanet.createTitleEmbed(titleInfo));
-			command.botGuild.log("Successfully sent title info: " + ManiaPlanet.stripFormatting(titleInfo.name));
+			command.botGuild.log(`Successfully sent ${ManiaPlanet.stripFormatting(titleInfo.name)} info.`);
 		});
 	}
 }

@@ -9,7 +9,7 @@ module.exports = {
 
 		// No channel specified.
 		if (command.galaxybot.talkChannel === undefined) {
-			command.channel.send("Sorry <@" + command.user.id + ">, but you forgot to set the channel used to talk as me.");
+			command.channel.send(`Sorry ${command.user}, but you forgot to set the channel used to talk as me.`);
 			command.botGuild.log("Talk channel not set.");
 			return;
 		}

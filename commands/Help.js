@@ -10,8 +10,8 @@ module.exports = {
 
 			// Command doesn't exist.
 			if (!command.galaxybot.availableCommands.has(commandName)) {
-				command.channel.send("Sorry <@" + command.user.id + ">, but I don't have a command named **" + commandName + "**. :rolling_eyes:");
-				command.botGuild.log("Command \"" + commandName + "\" doesn't exist.");
+				command.channel.send(`Sorry ${command.user}, but I don't have a command named **${command.galaxybot.escapeMentions(commandName)}**. :rolling_eyes:`);
+				command.botGuild.log(`Command "${commandName}" doesn't exist.`);
 				return;
 			}
 
@@ -39,7 +39,7 @@ module.exports = {
 		*/
 
 		// Commands documentation.
-		command.channel.send("You can find the full documentation of all my commands here, <@" + command.user.id + ">:\nhttps://github.com/domino54/galaxybot/blob/master/README.md");
+		command.channel.send(`You can find the full documentation of all my commands here, ${command.user}:\n${command.galaxybot.config.github}`);
 		command.botGuild.log("GalaxyBot documentation URL sent.");
 	}
 }

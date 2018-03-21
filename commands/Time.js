@@ -11,7 +11,7 @@ module.exports = {
 
 		// Display time in direct messages.
 		if (command.botGuild.type != "guild") {
-			command.channel.send("It's **" + time + "** for me!");
+			command.channel.send(`It's **${time}** for me!`);
 			return;
 		}
 
@@ -27,18 +27,18 @@ module.exports = {
 		switch (command.botGuild.sameTimeStreak) {
 			case 0 : {
 				if (diff == 1) {
-					command.channel.send("Wow, it's **" + time + "** now. Who'd have guessed one minute has passed.");
+					command.channel.send(`Wow, it's **${time}** now. Who'd have guessed one minute has passed.`);
 				} else if (diff <= 5) {
-					command.channel.send("Wow, it's **" + time + "** now. Who'd have guessed " + diff + " minutes have passed.");
+					command.channel.send(`Wow, it's **${time}** now. Who'd have guessed ${diff} minutes have passed.`);
 				} else {
-					command.channel.send("It's **" + time + "** for me!");
+					command.channel.send(`It's **${time}** for me!`);
 				}
 
 				break;
 			}
 
 			case 1 :
-				command.channel.send("It's still **" + time + "**.");
+				command.channel.send(`It's still **${time}**.`);
 				break;
 
 			case 2 :

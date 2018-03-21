@@ -9,7 +9,7 @@ module.exports = {
 	execute: command => {
 		// Nothing is being played right now.
 		if (!command.botGuild.currentTrack) {
-			command.channel.send("I'm not playing anything right now. Will you make a step to change that, <@" + command.user.id + ">? :smirk:");
+			command.channel.send(`I'm not playing anything right now. Will you make a step to change that, ${command.user}? :smirk:`);
 			command.botGuild.log("Nothing played in the guild.");
 			return;
 		}

@@ -8,7 +8,7 @@ module.exports = {
 	execute: command => {
 		// Title UID not specified.
 		if (command.arguments.length <= 0) {
-			command.channel.send("Sorry <@" + command.user.id + ">, but you need to specify the `UID` of a title you want to see servers of. Provide a valid `UID` in this command or use one of these short codes: " + ManiaPlanet.getTitleCodes().join(", ") + ".");
+			command.channel.send(`Sorry ${command.user}, but you need to specify the \`UID\` of a title you want to see servers of. Provide a valid \`UID\` in this command or use one of these short codes: ${ManiaPlanet.getTitleCodes().join(", ")}.`);
 			command.botGuild.log("No title UID specified.");
 			return;
 		}
@@ -21,40 +21,40 @@ module.exports = {
 		if (!isNaN(command.arguments[1]) && command.arguments[1] > 1) pageNb = command.arguments[1];
 		const offset = (pageNb - 1) * 10;
 		
-		command.botGuild.log("Downloading title info: " + titleUid);
+		command.botGuild.log(`Downloading "${titleUid}" title information.`);
 
 		// Download the title information.
 		ManiaPlanet.title(titleUid, titleInfo => {
 			// Title not found.
 			if (!titleInfo || titleInfo.code == 404) {
-				command.channel.send("Sorry, I can't recognize the **" + titleUid + "** title... :shrug:");
-				command.botGuild.log("Title not found: " + titleUid);
+				command.channel.send(`Sorry ${command.user}, I can't recognize the **${titleUid}** title... :shrug:`);
+				command.botGuild.log(`Title "${titleUid}" not found.`);
 				return;
 			}
 
 			const titleName = ManiaPlanet.stripFormatting(titleInfo.name);
-			command.botGuild.log("Obtained title infomation: " + titleName);
+			command.botGuild.log(`Obtained the ${titleName} infomation.`);
 
 			// Download the servers list.
 			ManiaPlanet.servers({"titleUids[]": titleUid, length: 11, offset: offset }, serversInfos => {
 				// No servers were found.
 				if (serversInfos.length <= 0) {
 					if (pageNb <= 1) {
-						command.channel.send("Looks like there are no servers online in **" + titleInfo.name + "** right now. :rolling_eyes:");
+						command.channel.send(`Looks like there are no servers online in **${titleName}** right now, ${command.user}. :rolling_eyes:`);
 					} else {
-						command.channel.send("**" + titleInfo.name + "** doesn't have this many servers. :thinking:");
+						command.channel.send(`**${titleName}** doesn't have this many servers, ${command.user}. :thinking:`);
 					}
 
-					command.botGuild.log("No servers found in title: " + titleName);
+					command.botGuild.log(`No servers found in ${titleName}.`);
 					return;
 				}
 
-				command.botGuild.log("Found " + serversInfos.length + " servers in " + titleName);
+				command.botGuild.log(`Found ${serversInfos.length} servers in ${titleName}.`);
 
 				// Only one server online - show a fancy embed.
 				if (serversInfos.length == 1) {
 					const embed = ManiaPlanet.createServerEmbed(serversInfos[0], titleInfo);
-					command.channel.send("There's only one server online in **" + titleInfo.name + "** right now.", embed);
+					command.channel.send(`There's only one server online in **${titleName}** right now.`, embed);
 					return;
 				}
 
@@ -75,7 +75,7 @@ module.exports = {
 					const nbPlayers = formatInteger(serverInfo.player_count, 3);
 					const nbPlayersMax = formatInteger(serverInfo.player_max, 3);
 
-					serversNodes.push(order + ". " + nbPlayers + " / " + nbPlayersMax + " " + ManiaPlanet.stripFormatting(serverInfo.name));
+					serversNodes.push(`${order}. ${nbPlayers} / ${nbPlayersMax} ${ManiaPlanet.stripFormatting(serverInfo.name)}`);
 				}
 
 				// Send the message.

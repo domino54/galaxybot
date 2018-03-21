@@ -10,14 +10,14 @@ module.exports = {
 	execute: command => {
 		// Music player not running and user is not in a voice channel.
 		if (!command.botGuild.voiceConnection && !command.member.voiceChannel) {
-			command.channel.send("You need join a voice channel before I can start playing anything, <@" + command.user.id + ">. :loud_sound:");
+			command.channel.send(`You need join a voice channel before I can start playing anything, ${command.user}. :loud_sound:`);
 			command.botGuild.log("User not in any voice channel.");
 			return;
 		}
 
 		// User not in our voice channel.
 		if (command.botGuild.voiceConnection && command.member.voiceChannel != command.botGuild.voiceConnection.channel && !command.botGuild.isGalaxyBotManager(command.member)) {
-			command.channel.send("You need to join my voice channel if you want to request something, <@" + command.user.id + ">. :point_up:");
+			command.channel.send(`You need to join my voice channel if you want to request something, ${command.user}. :point_up:`);
 			command.botGuild.log("User not in voice channel with bot.");
 			return;
 		}
@@ -32,8 +32,8 @@ module.exports = {
 
 			// Channel not found.
 			if (targetChannel === undefined) {
-				command.channel.send("Sorry <@" + command.user.id + ">, I couldn't find the channel you've specified. It doesn't exist or belongs to another server. :thinking:");
-				command.botGuild.log("Channel not found: " + channelId);
+				command.channel.send(`Sorry ${command.user}, I couldn't find the channel you've specified. It doesn't exist or belongs to another server. :thinking:`);
+				command.botGuild.log(`Channel with ID ${channelId} not found.`);
 				return;
 			}
 		}
@@ -65,8 +65,8 @@ module.exports = {
 
 			// No attachments found.
 			if (attachmentURL === false) {
-				command.channel.send("Sorry <@" + command.user.id + ">, I was unable to find recently sent attachments in <#" + targetChannel.id + ">. :cry:");
-				command.botGuild.log("No attachments found in #" + targetChannel.name);
+				command.channel.send(`Sorry ${command.user}, I was unable to find recently sent attachments in ${targetChannel}. :cry:`);
+				command.botGuild.log(`No attachments found in #${targetChannel.name}.`);
 				return;
 			}
 

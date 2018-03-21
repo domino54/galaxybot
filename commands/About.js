@@ -13,7 +13,10 @@ module.exports = {
 				name: user.tag,
 				icon_url: user.avatarURL
 			},
-			description: "A Discord bot providing multiple integrations for Nadeo games in ManiaPlanet platform, capable of playing some music and doing other useless stuff. Sometimes behaves extremely impolitely, but that's just her nature.\n\n[**Documentation**](https://github.com/domino54/galaxybot/blob/master/README.md) • [**Add to your server**](https://discordapp.com/oauth2/authorize?client_id=" + command.galaxybot.client.user.id + "&scope=bot&permissions=137456704)",
+			description:
+				"A Discord bot providing multiple integrations for Nadeo games in ManiaPlanet platform, capable of playing some music and doing other useless stuff. Sometimes behaves extremely impolitely, but that's just her nature.\n\n" +
+				`**[Documentation](${command.galaxybot.config.github})** • ` +
+				`**[Add to your server](https://discordapp.com/oauth2/authorize?client_id=${command.galaxybot.client.user.id}&scope=bot&permissions=137456704)**`,
 			color: (member && member.displayColor > 0 ? member.displayColor : undefined),
 			thumbnail: {
 				url: user.avatarURL
