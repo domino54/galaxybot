@@ -1,5 +1,6 @@
 const Discord = require("discord.js");
 const ytdl = require("ytdl-core");
+const youtubedl = require("youtube-dl");
 const metadata = require("music-metadata");
 const HTTPS = require("https");
 const URL = require("url");
@@ -25,7 +26,8 @@ class Track {
 		this.sourceURL = undefined;
 		this.sender = sender;
 		this.senderId = sender.id;
-		this.type = undefined;
+		this.class = undefined;
+		this.type = "track";
 		this.color = 0;
 		this.embed = undefined;
 
@@ -40,6 +42,18 @@ class Track {
 
 		// YouTube
 		if (url.match(/https?:\/\/(www\.)?(youtube\.com\/(watch\?v=|embed\/)|youtu\.be\/)[\w-]{11}/i)) this.loadYouTube(callback);
+
+		// SoundCloud
+		else if (url.match(/https?:\/\/(www\.)?soundcloud\.com\//i)) this.loadSoundCloud(callback);
+
+		// Mixcloud
+		else if (url.match(/https?:\/\/(www\.)?mixcloud\.com\//i)) this.loadMixcloud(callback);
+
+		// Vimeo
+		else if (url.match(/https?:\/\/(www\.)?vimeo\.com\/[0-9]+/i)) this.loadVimeo(callback);
+
+		// Dailymotion
+		else if (url.match(/https?:\/\/(www\.)?dailymotion\.com\/video\/+/i)) this.loadDailymotion(callback);
 
 		// Facebook
 		else if (url.match(/https?:\/\/(www\.|web\.)?facebook\.com\/.*\/videos\/[0-9]+/i)) this.loadFacebook(callback);
@@ -58,13 +72,14 @@ class Track {
 	}
 
 	/**
-	 * Get track information from local drive.
+	 * Get file information from local drive.
 	 *
 	 * @param {Function} callback - Function to call when the file info is obtained.
 	 */
 	loadLocalFile(callback) {
 		this.sourceURL = this.url;
-		this.type = "offline";
+		this.class = "offline";
+		this.type = "file";
 		this.title = this.url.split(/\/|\\/).pop();
 		this.isLocalFile = true;
 		this.url = undefined;
@@ -103,7 +118,7 @@ class Track {
 	}
 
 	/**
-	 * Get track information from YouTube.
+	 * Get video information from YouTube.
 	 *
 	 * @param {Function} callback - Function to call when YouTube info is obtained.
 	 */
@@ -116,7 +131,8 @@ class Track {
 			}
 
 			// Video information.
-			this.type = "youtube";
+			this.class = "youtube";
+			this.type = info.livestream ? "livestream" : "video";
 			this.title = this.constructor.escapeMentions(info.title);
 			this.uniqueID = info.video_id;
 			this.author = {
@@ -138,7 +154,202 @@ class Track {
 	}
 
 	/**
-	 * Get track information from Facebook.
+	 * Get media information via youtube-dl.
+	 *
+	 * @param {Function} callback - Function to call when information is obtained.
+	 */
+	loadCommon(callback) {
+		youtubedl.getInfo(this.url, (error, info) => {
+			if (error || !info.formats || info.formats.length <= 0) {
+				callback(error, undefined);
+				return;
+			}
+
+			console.log(info);
+
+			// Track information.
+			this.title = info.title;
+			this.uniqueID = info.display_id;
+			this.author = {
+				name: info.uploader,
+				url: info.uploader_url
+			};
+			this.description = info.description;
+			this.thumbnail = info.thumbnail;
+
+			// Translate duration into seconds.
+			if (info.duration) {
+				var explode = info.duration.split(":");
+				var multiplier = 1;
+
+				for (var i = explode.length - 1; i >= 0; i--) {
+					var seg = parseInt(explode[i]) * multiplier;
+					this.duration += seg;
+					multiplier *= 60;
+				}
+			}
+
+			callback(undefined, info);
+		});
+	}
+
+	/**
+	 * Get track information from SoundCloud.
+	 *
+	 * @param {Function} callback - Function to call when SoundCloud info is obtained.
+	 */
+	loadSoundCloud(callback) {
+		this.loadCommon((error, info) => {
+			if (error) {
+				console.log(error);
+				callback(false);
+				return;
+			}
+
+			// Pick the best available format.
+			var highestBitrate = 0;
+
+			for (const format of info.formats) {
+				if (format.abr < highestBitrate) continue;
+
+				this.sourceURL = format.url;
+				highestBitrate = format.abr;
+			}
+
+			// Track information.
+			this.class = "soundcloud";
+			this.author.icon_url = "https://cdn.iconscout.com/public/images/icon/free/png-512/soundcloud-social-media-3d8748562dbd11dc-512x512.png";
+
+			// Create embed.
+			this.color = 0xFF6600;
+			this.embed = this.createEmbed();
+
+			callback(this);
+		});
+	}
+
+	/**
+	 * Get video information from Vimeo.
+	 *
+	 * @param {Function} callback - Function to call when Vimeo info is obtained.
+	 */
+	loadVimeo(callback) {
+		this.loadCommon((error, info) => {
+			if (error) {
+				console.log(error);
+				callback(false);
+				return;
+			}
+
+			// Pick the best available format.
+			var highestBitrate = 0;
+
+			for (const format of info.formats) {
+				if (format.vcodec == "none" || format.asr < highestBitrate) continue;
+
+				this.sourceURL = format.url;
+				highestBitrate = format.abr;
+			}
+
+			// No formats available with audio only.
+			if (!this.sourceURL) this.sourceURL = info.formats[0].url;
+
+			// Track information.
+			this.class = "vimeo";
+			this.type = "video";
+			this.author.icon_url = "https://www.iconsdb.com/icons/preview/caribbean-blue/vimeo-4-xxl.png";
+
+			// Create embed.
+			this.color = 0x1AB7EA;
+			this.embed = this.createEmbed();
+
+			callback(this);
+		});
+	}
+
+	/**
+	 * Get video information from Dailymotion.
+	 *
+	 * @param {Function} callback - Function to call when Dailymotion info is obtained.
+	 */
+	loadDailymotion(callback) {
+		this.loadCommon((error, info) => {
+			if (error) {
+				console.log(error);
+				callback(false);
+				return;
+			}
+
+			// Pick the best available format.
+			var highestBitrate = 0;
+
+			for (const format of info.formats) {
+				if (format.vcodec == "none" || format.asr < highestBitrate) continue;
+
+				this.sourceURL = format.url;
+				highestBitrate = format.abr;
+			}
+
+			// No formats available with audio only.
+			if (!this.sourceURL) this.sourceURL = info.formats[0].url;
+
+			// Track information.
+			this.class = "dailymotion";
+			this.type = "video";
+			this.author.icon_url = "https://static1.dmcdn.net/images/dailymotion-logo-ogtag.png";
+
+			// Create embed.
+			this.color = 0x0064E0;
+			this.embed = this.createEmbed();
+
+			callback(this);
+		});
+	}
+
+	/**
+	 * Get mix information from Mixcloud.
+	 *
+	 * @param {Function} callback - Function to call when Mixcloud info is obtained.
+	 */
+	loadMixcloud(callback) {
+		this.loadCommon((error, info) => {
+			if (error) {
+				console.log(error);
+				callback(false);
+				return;
+			}
+
+			// Pick the best available format.
+			var highestBitrate = 0;
+			
+			for (const format of info.formats) {
+				// Compute the duration.
+				if (format.fragments) {
+					console.log(format.fragments.length);
+					for (const fragment of format.fragments) if (fragment.duration) this.duration += fragment.duration;
+				}
+
+				if (format.tbr < highestBitrate) continue;
+
+				this.sourceURL = format.url;
+				highestBitrate = format.tbr;
+			}
+
+			// Track information.
+			this.class = "mixcloud";
+			this.type = "mix";
+			this.author.icon_url = "https://www.demand-its.com/wp-content/uploads/2014/12/mixcloud.png";
+
+			// Create embed.
+			this.color = 0x52AAD8;
+			this.embed = this.createEmbed();
+
+			callback(this);
+		});
+	}
+
+	/**
+	 * Get video information from Facebook.
 	 *
 	 * @param {Function} callback - Function to call when Facebook info is obtained.
 	 */
@@ -155,7 +366,8 @@ class Track {
 			}
 
 			// Video information.
-			this.type = "facebook";
+			this.class = "facebook";
+			this.type = response.live_status ? "livestream" : "video";
 			this.sourceURL = response.source;
 			this.title = this.constructor.escapeMentions(response.title);
 			this.uniqueID = videoID;
@@ -199,7 +411,8 @@ class Track {
 					const file = info.files["mp4-mobile"];
 
 					// Video information.
-					this.type = "streamable";
+					this.class = "streamable";
+					this.type = "video";
 					this.sourceURL = "https:" + file.url;
 					this.title = this.constructor.escapeMentions(info.title);
 					this.uniqueID = videoID;
@@ -236,7 +449,8 @@ class Track {
 		}
 
 		// Track information.
-		this.type = "online";
+		this.class = "online";
+		this.type = "file";
 		this.sourceURL = this.url;
 		this.uniqueID = this.url;
 		this.title = this.url.split("/").pop().replace(/_/g, " ");
@@ -292,7 +506,7 @@ class Track {
 			thumbnail: {
 				url: this.thumbnail
 			},
-			description: (this.isLivestream ? "Livestream" : "Duration: " + this.constructor.timeToText(parseInt(this.duration))),
+			description: (this.isLivestream ? "Livestream" : "Duration: " + (this.duration > 0 ? this.constructor.timeToText(parseInt(this.duration)) : "unknown")),
 			footer: {
 				text: this.sender.displayName,
 				icon_url: this.sender.user.avatarURL

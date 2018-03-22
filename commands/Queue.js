@@ -1,14 +1,14 @@
 module.exports = {
 	name: "queue",
-	description: "Lists up to 10 upcoming entries in the music player queue. `me` can be used to list upcoming tracks requested by you.",
+	description: "Lists up to 10 upcoming entries in the music player queue. Specify `page` to browse a certain page of the queue. `me` can be used to list your upcoming requests.",
 	serverOnly: true,
 	musicPlayer: true,
 
 	execute: command => {
 		// The tracks queue is completely empty.
 		if (command.botGuild.tracksQueue.length <= 0) {
-			command.channel.send(`The tracks queue is empty. Will you make a step to change that, ${command.user}? :smirk:`);
-			command.botGuild.log("Tracks queue empty.");
+			command.channel.send(`The music player queue is empty. Will you make a step to change that, ${command.user}? :smirk:`);
+			command.botGuild.log("Music player queue empty.");
 			return;
 		}
 
@@ -20,17 +20,17 @@ module.exports = {
 				if (track.senderId == command.user.id) upcomingTracks.push(track);
 			}
 
-			command.botGuild.log(`${command.user.tag} has ${upcomingTracks.length} track requests.`);
+			command.botGuild.log(`${command.user.tag} has ${upcomingTracks.length} music player requests.`);
 
 			switch (upcomingTracks.length) {
 				// No tracks requested by the user.
 				case 0 :
-					command.channel.send(`Looks like there are no upcoming tracks requested by you, ${command.user}.`);
+					command.channel.send(`Looks like you don't have any upcoming requests, ${command.user}.`);
 					break;
 
 				// Only one track requested by the user.
 				case 1 :
-					command.channel.send(`You have one upcoming track, ${command.user}:`, upcomingTracks[0].embed);
+					command.channel.send(`You have one upcoming ${upcomingTracks[0].type}, ${command.user}:`, upcomingTracks[0].embed);
 					break;
 
 				// Create the tracks list.
@@ -43,7 +43,7 @@ module.exports = {
 						tracksList.push(`${position}. ${track.title}`);
 					}
 
-					command.channel.send(`You have **${upcomingTracks.length}** tracks waiting in the queue, ${command.user}: \n\`\`\`${tracksList.join("\n")}\`\`\``);
+					command.channel.send(`You have **${upcomingTracks.length}** requests waiting in the queue, ${command.user}: \n\`\`\`${tracksList.join("\n")}\`\`\``);
 				}
 			}
 
@@ -65,8 +65,8 @@ module.exports = {
 
 			// Queue is not that long
 			if (offset > command.botGuild.tracksQueue.length) {
-				command.channel.send(`The tracks queue is only **${command.botGuild.tracksQueue.length}** tracks long, ${command.user}. :shrug:`);
-				command.botGuild.log("Given order exceeds the tracks queue length.");
+				command.channel.send(`The music player queue is only **${command.botGuild.tracksQueue.length}** requests long, ${command.user}. :shrug:`);
+				command.botGuild.log("Given order exceeds the music player queue length.");
 				return;
 			}
 
@@ -78,7 +78,7 @@ module.exports = {
 				tracksList.push(`${i + 1}. ${track.title} (requested by ${track.sender.displayName})`);
 			}
 
-			command.channel.send(`There are **${command.botGuild.tracksQueue.length}** tracks in the queue: \n\`\`\`${tracksList.join("\n")}\`\`\``);
+			command.channel.send(`There are **${command.botGuild.tracksQueue.length}** requests in the queue: \n\`\`\`${tracksList.join("\n")}\`\`\``);
 		}
 	}
 }

@@ -3,7 +3,7 @@ const URL = require("url");
 
 module.exports = {
 	name: "play",
-	description: "Connects to a voice channel and plays audio from the given link. You can request videos from YouTube, Facebook and Streamable, send direct link to a file or a YouTube playlist (up to 100 videos). If an invalid URL is given, GalaxyBot will search the phrase in YouTube and play the first playable result. `now` and `next` allow GalaxyBot managers to play the track instantly or insert it at the beginning of the queue. If an audio file is attached to the message, GalaxyBot will attempt to play it.",
+	description: "Connects to a voice channel and plays audio from the given link. You can request videos from SoundCloud, Mixcloud, YouTube, Vimeo, Dailymotion, Facebook and Streamable, send direct link to a file or a YouTube playlist (up to 100 videos). If an invalid URL is given, GalaxyBot will search the phrase in YouTube and play the first playable result. `now` and `next` allow GalaxyBot managers to play the track instantly or insert it at the beginning of the queue. If an audio file is attached to the message, GalaxyBot will attempt to play it.",
 	serverOnly: true,
 	musicPlayer: true,
 	limitedAccess: true,
@@ -64,7 +64,6 @@ module.exports = {
 		}
 
 		// Create a new track object for the speicifed URL.
-		const ytAvailable = command.galaxybot.config.youtube && command.galaxybot.config.youtube.token;
 		const query = command.arguments.join(" ");
 		const url = command.arguments[0].replace(/<|>/g, "");
 		const ytlist = query.match(/^https?:\/\/(www\.)?(youtu\.be|youtube\.com)\/playlist\?list=[\w-]+/g);
@@ -87,19 +86,12 @@ module.exports = {
 
 		// Load YouTube playlist.
 		else if (ytlist) {
-			// Can't download YouTube playlist info: API token not provided.
-			if (!ytAvailable) {
-				command.channel.send("I can't add YouTube playlists, API token is missing in my configuration file! :rolling_eyes:");
-				command.botGuild.log("Wrong YouTube configuration: token not specified.");
-				return;
-			}
-
 			const playlistURL = ytlist[0];
 			const playlistID = playlistURL.match(/[\w-]+$/)[0];
 			
 			command.botGuild.addPlaylistYouTube(playlistID, command.member).then(nbVideos => {
 				if (nbVideos > 0) {
-					command.channel.send(`Okay ${command.user}, I'm adding **${nbVideos}** tracks from your playlist to the queue!`);
+					command.channel.send(`Okay ${command.user}, I'm adding **${nbVideos}** videos from your playlist to the queue!`);
 				}
 			}).catch(error => {
 				var errorMessage;
@@ -107,11 +99,11 @@ module.exports = {
 				switch (error) {
 					// YouTube is unavailable.
 					case "yt unavailable" :
-						errorMessage = "I can't search for tracks in YouTube, API token is missing in my configuration file! :rolling_eyes:";
+						errorMessage = "I add YouTube playlists, API token is missing in my configuration file! :rolling_eyes:";
 						break;
 
 					// Unknown.
-					default : errorMessage = "An error has occured while I was searching on YouTube. If the problem persists, please contact my creator!";
+					default : errorMessage = "An error has occured while I was adding a YouTube playlist. If the problem persists, please contact my creator!";
 				}
 
 				command.channel.send(errorMessage);
@@ -134,7 +126,7 @@ module.exports = {
 			command.botGuild.searchYouTube(query, command.member).then(nbVideos => {
 				// A playlist has been added.
 				if (nbVideos > 0) {
-					command.channel.send(`Okay ${command.user}, I'm adding **${nbVideos}** tracks from your playlist to the queue!`);
+					command.channel.send(`Okay ${command.user}, I'm adding **${nbVideos}** videos from your playlist to the queue!`);
 				}
 			}).catch(error => {
 				var errorMessage;
@@ -142,7 +134,7 @@ module.exports = {
 				switch (error) {
 					// YouTube is unavailable.
 					case "yt unavailable" :
-						errorMessage = "I can't search for tracks in YouTube, API token is missing in my configuration file! :rolling_eyes:";
+						errorMessage = "I can't search for videos and playlists in YouTube, API token is missing in my configuration file! :rolling_eyes:";
 						break;
 
 					// Incorrect query specified.

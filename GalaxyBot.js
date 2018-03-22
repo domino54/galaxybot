@@ -28,6 +28,7 @@ class GalaxyBot {
 	constructor() {
 		this.client = new Discord.Client();
 		this.client.on("ready", () => { this.onReady(); });
+		this.client.on("error", error => { console.log(error); });
 		this.client.on("message", message => { this.onMessage(message); });
 		this.client.on("messageUpdate", (messageOld, messageNew) => { this.onEditedMessage(messageOld, messageNew); });
 		this.client.on("messageReactionAdd", (reaction, user) => { this.onNewReaction(reaction, user); });
@@ -428,7 +429,7 @@ class GalaxyBot {
 		else if (user.askedToCryChannel !== false) {
 			if (message.content.match(/yes/i) && message.channel.id == user.askedToCryChannel) {
 				message.channel.send(`Okay ${message.author}. *Goes to a corner and pretends to cry.*`);
-				gguild.log(`${message.author.tag} wants me to cry.`);
+				guild.log(`${message.author.tag} wants me to cry.`);
 			}
 
 			user.askedToCryChannel = false;

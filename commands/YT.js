@@ -25,7 +25,7 @@ module.exports = {
 		command.botGuild.searchYouTube(query, command.member).then(nbVideos => {
 			// A playlist has been added.
 			if (nbVideos > 0) {
-				command.channel.send(`Okay ${command.user}, I'm adding **${nbVideos}** tracks from your playlist to the queue!`);
+				command.channel.send(`Okay ${command.user}, I'm adding **${nbVideos}** videos from your playlist to the queue!`);
 			}
 		}).catch(error => {
 			var errorMessage;
@@ -33,7 +33,7 @@ module.exports = {
 			switch (error) {
 				// YouTube is unavailable.
 				case "yt unavailable" :
-					errorMessage = "I can't search for tracks in YouTube, API token is missing in my configuration file! :rolling_eyes:";
+					errorMessage = "I can't search for videos and playlists in YouTube, API token is missing in my configuration file! :rolling_eyes:";
 					break;
 
 				// Incorrect query specified.

@@ -49,13 +49,13 @@ Instead of using title `id` in commands you can use one of following short codes
 
 | Command                         | Description |
 |:-------------------------------:| ----------- |
-| `play <url\|query> [now\|next]` | Connects to a voice channel and plays audio from the given link. You can request videos from YouTube, Facebook and Streamable, send direct link to a file or a YouTube playlist. If an invalid URL is given, GalaxyBot will search the phrase in YouTube and play the first playable result. `now` and `next` allow GalaxyBot managers to play the track instantly or insert it at the beginning of the queue. If an audio file is attached to the message, GalaxyBot will attempt to play it.
+| `play <url\|query> [now\|next]` | Connects to a voice channel and plays audio from the given link. You can request videos from SoundCloud, Mixcloud, YouTube, Vimeo, Dailymotion, Facebook and Streamable, send direct link to a file or a YouTube playlist. If an invalid URL is given, GalaxyBot will search the phrase in YouTube and play the first playable result. `now` and `next` allow GalaxyBot managers to play the track instantly or insert it at the beginning of the queue. If an audio file is attached to the message, GalaxyBot will attempt to play it.
 | `playattachment [#] [channel]`  | Puts the latest audio file attachment sent in the channel in the queue. `#` can be used to determine which attachment should be played. Adding the `channel` parameter will search for an attachment in this particular channel.
-| `youtube <query>`               | Search for a YouTube video or playlist and add it to the music player queue.
+| `yt <query>`                    | Search for a YouTube video or playlist and add it to the music player queue.
 | `undo [quantity\|all]`          | Removes the latest track you've requested. Specify `quantity` to remove a certain number of tracks, or `all` to remove all your requests.
 | `now`                           | Shows what is currently being played.
-| `next [me\|order]`              | Shows details of the next track in the queue. `me` shows upcoming song requested by you. `order` can tell which track is at specific position in the queue.
-| `queue`                         | Lists up to 10 upcoming entries in the music player queue. `me` can be used to list upcoming tracks requested by you.
+| `next [me\|order]`              | Shows details of the next request in the queue. `me` shows your first upcoming request. `order` can tell which request is at specific position in the queue.
+| `queue [me\|page]`              | Lists up to 10 upcoming entries in the music player queue. Specify `page` to browse a certain page of the queue. `me` can be used to list your upcoming requests.
 | `skip`                          | Skips the currently played song. GalaxyBot managers can skip any song, while other users may skip it only if it's been requested by them.
 | `stop`                          | Allows GalaxyBot managers to stop music playback and clear the queue.
 | `pause`                         | Pauses the current track playback. The same command will resume the playback.

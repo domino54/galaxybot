@@ -38,7 +38,7 @@ module.exports = {
 		switch (tracksToRemove.length) {
 			// None of the tracks were removed.
 			case 0 : {
-				command.channel.send(`Looks like there are no tracks requested by you, ${command.user}. :shrug:`);
+				command.channel.send(`Looks like there are no requests sent by you, ${command.user}. :shrug:`);
 				command.botGuild.log(`No tracks requested by ${command.user.tag}.`);
 				break;
 			}
@@ -46,15 +46,15 @@ module.exports = {
 			// Only one track got removed.
 			case 1 : {
 				const track = tracksToRemove[0];
-				command.channel.send(`I removed your latest request, ${command.user}: **${track.title}**.`);
-				command.botGuild.log(`Track removed from queue: "${track.title}".`);
+				command.channel.send(`I removed your latest ${track.type}, ${command.user}: **${track.title}**.`);
+				command.botGuild.log(`Removed ${track.type} from queue: "${track.title}".`);
 				break;
 			}
 
 			// Multiple requests removed.
 			default : {
 				command.channel.send(`I removed your **${tracksToRemove.length}** most recent requests, ${command.user}.`);
-				command.botGuild.log(`Removed ${tracksToRemove.length} tracks requested by ${command.user.tag}.`);
+				command.botGuild.log(`Removed ${tracksToRemove.length} items requested by ${command.user.tag}.`);
 			}
 		}
 

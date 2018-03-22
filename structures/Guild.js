@@ -188,8 +188,10 @@ class Guild {
 
 		// Leave voice channel if queue is empty.
 		if (this.tracksQueue.length <= 0) {
-			if (this.voiceConnection) this.voiceConnection.disconnect();
-			this.log("Queue empty, leaving the voice channel.");
+			if (this.voiceConnection) {
+				this.voiceConnection.disconnect();
+				this.log("Queue empty, leaving the voice channel.");
+			}
 			return;
 		}
 
@@ -207,13 +209,14 @@ class Guild {
 		// Create a voice dispatcher.
 		try {
 			this.log("Creating a new voice dispatcher.");
+			const streamOptions = { passes: 3, bitrate: 44100 };
 
-			switch (this.currentTrack.type) {
+			switch (this.currentTrack.class) {
 				// Create a stream of YouTube video.
 				case "youtube" : {
 					this.activeStream = ytdl(this.currentTrack.url, (this.currentTrack.isLivestream ? null : { filter: "audioonly" }));
 
-					this.voiceDispatcher = this.voiceConnection.playStream(this.activeStream, { passes: 3, bitrate: 44100 });
+					this.voiceDispatcher = this.voiceConnection.playStream(this.activeStream, streamOptions);
 
 					this.activeStream.on("error", error => {
 						console.log(error);
@@ -237,7 +240,7 @@ class Guild {
 
 		// Super handy error logging.
 		catch (error) {
-			this.lastTextChannel.send("Something must've gone wrong with last track, I couldn't play it... ```" + error + "```");
+			this.lastTextChannel.send(`Something must've gone wrong with last ${this.currentTrack.type}, I couldn't play it... \`\`\`${error}\`\`\``);
 			this.log("A problem has occured while trying to play track: " + error);
 			this.currentTrack = undefined;
 			
@@ -265,7 +268,7 @@ class Guild {
 		// Show what's currently being played.
 		var header = this.currentTrack.isLivestream
 			? `I'm tuned up for the livestream, <@${this.currentTrack.senderId}>! :red_circle:`
-			: `I'm playing your track now, <@${this.currentTrack.senderId}>! :metal:`;
+			: `I'm playing your ${this.currentTrack.type} now, <@${this.currentTrack.senderId}>! :metal:`;
 
 		this.lastTextChannel.send(header, this.currentTrack.embed);
 		this.log("Now playing: " + this.currentTrack.title);
@@ -301,7 +304,7 @@ class Guild {
 
 			// Unsupported link type.
 			case "unsupported" : {
-				errorMessage = `I can't play that resource, ${member}. Make sure you're requesting a video from YouTube, Facebook, Streamable, a YouTube playlist or uploading a music file attachment. :rolling_eyes:\n\`\`\`Error code: ${track}\`\`\``;
+				errorMessage = `I can't play that resource, ${member}. Make sure you're requesting something from SoundCloud, Mixcloud, YouTube, Vimeo, Dailymotion, Facebook, Streamable, a YouTube playlist or uploading a music file attachment. :rolling_eyes:\n\`\`\`Error code: ${track}\`\`\``;
 				this.log(`Track "${url}" not added: unsupported host.`);
 				break;
 			}
@@ -393,7 +396,7 @@ class Guild {
 
 		// No permissions to insert at the beginning of the queue.
 		else {
-			if (isNext) this.lastTextChannel.send(`Sorry ${member}, you can't queue track next, nor play it immediately. :rolling_eyes:`);
+			if (isNext) this.lastTextChannel.send(`Sorry ${member}, you can't queue ${track.type} next, nor play it immediately. :rolling_eyes:`);
 
 			this.tracksQueue.push(track);
 			this.uniqueTracks.push(track.uniqueID);
@@ -445,7 +448,7 @@ class Guild {
 		}
 
 		// Somehow we are in a voice channel, but nothing is being played.
-		// else if (!this.currentTrack) this.playNextTrack();
+		else if (!this.currentTrack) this.playNextTrack();
 
 		// Play the track right now.
 		else if (options && options.isNow === true && hasPermissions && this.voiceDispatcher) {
@@ -456,7 +459,7 @@ class Guild {
 		// Show queue message.
 		else if (!isSilent) {
 			var position = this.tracksQueue.indexOf(track) + 1;
-			this.lastTextChannel.send(`${member}, your track is **#${position}** in the queue:`, track.embed);
+			this.lastTextChannel.send(`${member}, your ${track.type} is **#${position}** in the queue:`, track.embed);
 		}
 	}
 
@@ -479,7 +482,7 @@ class Guild {
 			const options = { maxResults: (maxResults > 0 ? maxResults : 0) };
 
 			yt_playlist(this.galaxybot.config.youtube.token, playlistID, options).then(items => {
-				this.log("Found " + items.length + " tracks in playlist " + playlistID);
+				this.log(`Found ${items.length} videos in playlist ${playlistID}.`);
 
 				for (var i = 0; i < items.length; i++) {
 					const videoURL = "https://www.youtube.com/watch?v=" + items[i].resourceId.videoId;
