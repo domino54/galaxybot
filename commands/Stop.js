@@ -35,7 +35,7 @@ module.exports = {
 		command.botGuild.uniqueTracks = [];
 
 		// Clear all timers created by adding a playlist.
-		for (const timer of command.botGuild.pendingTimers) clearTimeout(timer);
+		for (const item of command.botGuild.pendingTimers) clearTimeout(item.timer);
 		command.botGuild.pendingTimers = [];
 		command.botGuild.lastStop = Date.now();
 

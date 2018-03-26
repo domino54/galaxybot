@@ -37,6 +37,15 @@ class User {
 	}
 
 	/**
+	 * Get the color of the GalaxyBot. Always undefined.
+	 *
+	 * @returns {undefined} Undefined.
+	 */
+	get color() {
+		return undefined;
+	}
+
+	/**
 	 * Get the GalaxyBot default setting.
 	 *
 	 * @param {string} settingName - Name of the setting to get.

@@ -6,23 +6,22 @@ module.exports = {
 
 	execute: command => {
 		if (command.arguments[0]) {
-			const commandName = command.arguments[0];
+			const commandName = command.galaxybot.escapeMentions(command.arguments[0], command.message.mentions);
 
 			// Command doesn't exist.
 			if (!command.galaxybot.availableCommands.has(commandName)) {
-				command.channel.send(`Sorry ${command.user}, but I don't have a command named **${command.galaxybot.escapeMentions(commandName)}**. :rolling_eyes:`);
+				command.channel.send(`Sorry ${command.user}, but I don't have a command named **${commandName}**. :rolling_eyes:`);
 				command.botGuild.log(`Command "${commandName}" doesn't exist.`);
 				return;
 			}
 
 			// Send the command description.
 			const commandModel = command.galaxybot.availableCommands.get(commandName);
-			var member = command.guild ? command.guild.members.get(command.galaxybot.client.user.id) : undefined;
-
+			
 			command.channel.send(new Discord.RichEmbed({
 				title: commandModel.name,
 				description: commandModel.description,
-				color: (member && member.displayColor > 0 ? member.displayColor : undefined)
+				color: command.botGuild.color
 			}));
 
 			return;

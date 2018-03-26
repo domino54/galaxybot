@@ -1,6 +1,9 @@
+const Track = require("./../structures/Track.js");
+const youtubedl = require("youtube-dl");
+
 module.exports = {
-	name: "yt",
-	description: "Search for a YouTube video or playlist and add it to the music player queue.",
+	name: "sc",
+	description: "Search for a SoundCloud track and add it to the music player queue.",
 	serverOnly: true,
 	musicPlayer: true,
 	limitedAccess: true,
@@ -31,36 +34,17 @@ module.exports = {
 
 		const query = command.arguments.join(" ");
 
-		command.botGuild.searchYouTube(query, command.member).then(nbVideos => {
-			// A playlist has been added.
-			if (nbVideos > 0) {
-				command.channel.send(`Okay ${command.user}, I'm adding **${nbVideos}** videos from your playlist to the queue!`);
-			}
-		}).catch(error => {
-			var errorMessage;
+		// Query is too short.
+		if (query.length <= 0) {
+			command.channel.send(`First of all, you need to tell me what should I play, ${command.user}. :shrug:`);
+			command.botGuild.log("No query specified.");
+			return;
+		}
 
-			switch (error) {
-				// YouTube is unavailable.
-				case "yt unavailable" :
-					errorMessage = "I can't search for videos and playlists in YouTube, API token is missing in my configuration file! :rolling_eyes:";
-					break;
-
-				// Incorrect query specified.
-				case "bad query" :
-					errorMessage = `First of all, you need to tell me what should I play, ${command.user}. :shrug:`;
-					break;
-
-				// YouTube is unavailable.
-				case "no results" :
-					errorMessage = `I couldn't find anything matching **${command.galaxybot.escapeMentions(query, command.message.mentions)}**, ${command.user}. :cry:`;
-					break;
-				
-				// Unknown.
-				default : errorMessage = `An error has occured while I was searching on YouTube. If the problem persists, please contact my creator!\n\`\`\`${error}\`\`\``;
-			}
-
-			command.channel.send(errorMessage);
-			command.botGuild.log("Error occured while searching in YouTube: " + error);
+		// Search for a track in SoundCloud.
+		var url = "scsearch:" + query;
+		var track = new Track(url, command.member, track => {
+			command.botGuild.onTrackCreated(track, command.member, url);
 		});
 	}
 }

@@ -78,14 +78,34 @@ class GalaxyBot {
 	 * Remove mentions from the string.
 	 *
 	 * @param {String} text - The text to escape.
+	 * @param {MessageMentions} mentions - Discord mentions object.
 	 * @returns {String} The escaped string.
 	 */
-	escapeMentions(text) {
+	escapeMentions(text, mentions) {
 		if (typeof text !== "string") return "";
 		
 		var output = text;
 		output = output.replace(/@everyone/i, "everyone");
 		output = output.replace(/@here/i, "here");
+
+		if (mentions) {
+			if (mentions.members) mentions.members.forEach((member, id) => {
+				output = output.replace(new RegExp(`${member}`, "g"), member.displayName);
+			});
+
+			if (mentions.roles) mentions.roles.forEach((role, id) => {
+				output = output.replace(new RegExp(`${role}`, "g"), role.name);
+			});
+
+			if (mentions.users) mentions.users.forEach((user, id) => {
+				output = output.replace(new RegExp(`${user}`, "g"), user.username);
+			});
+
+			if (mentions.channels) mentions.channels.forEach((channel, id) => {
+				output = output.replace(new RegExp(`${channel}`, "g"), "#" + channel.name);
+			});
+		}
+
 		return output;
 	}
 
@@ -156,7 +176,7 @@ class GalaxyBot {
 
 		// Random statuses.
 		this.pickNextStatus();
-		setInterval(() => { this.pickNextStatus(); }, 30000);
+		setInterval(() => { this.pickNextStatus(); }, 60000);
 
 		// Register already existing guilds.
 		this.client.guilds.forEach((guild, guildId) => {

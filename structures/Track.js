@@ -44,7 +44,7 @@ class Track {
 		if (url.match(/https?:\/\/(www\.)?(youtube\.com\/(watch\?v=|embed\/)|youtu\.be\/)[\w-]{11}/i)) this.loadYouTube(callback);
 
 		// SoundCloud
-		else if (url.match(/https?:\/\/(www\.)?soundcloud\.com\//i)) this.loadSoundCloud(callback);
+		else if (url.match(/https?:\/\/(www\.)?soundcloud\.com\//i) || url.startsWith("scsearch:")) this.loadSoundCloud(callback);
 
 		// Mixcloud
 		else if (url.match(/https?:\/\/(www\.)?mixcloud\.com\//i)) this.loadMixcloud(callback);
@@ -142,7 +142,7 @@ class Track {
 			}
 			this.description = info.description;
 			this.duration = info.length_seconds;
-			this.thumbnail = "http://img.youtube.com/vi/" + info.video_id + "/mqdefault.jpg";
+			this.thumbnail = "http://img.youtube.com/vi/" + info.video_id + "/hqdefault.jpg";
 			this.isLivestream = info.livestream;
 
 			// Create embed.
@@ -164,8 +164,6 @@ class Track {
 				callback(error, undefined);
 				return;
 			}
-
-			console.log(info);
 
 			// Track information.
 			this.title = info.title;
@@ -202,7 +200,7 @@ class Track {
 		this.loadCommon((error, info) => {
 			if (error) {
 				console.log(error);
-				callback(false);
+				callback(undefined);
 				return;
 			}
 
@@ -218,6 +216,7 @@ class Track {
 
 			// Track information.
 			this.class = "soundcloud";
+			this.url = info.webpage_url;
 			this.author.icon_url = "https://cdn.iconscout.com/public/images/icon/free/png-512/soundcloud-social-media-3d8748562dbd11dc-512x512.png";
 
 			// Create embed.
@@ -237,7 +236,7 @@ class Track {
 		this.loadCommon((error, info) => {
 			if (error) {
 				console.log(error);
-				callback(false);
+				callback(undefined);
 				return;
 			}
 
@@ -276,7 +275,7 @@ class Track {
 		this.loadCommon((error, info) => {
 			if (error) {
 				console.log(error);
-				callback(false);
+				callback(undefined);
 				return;
 			}
 
@@ -315,7 +314,7 @@ class Track {
 		this.loadCommon((error, info) => {
 			if (error) {
 				console.log(error);
-				callback(false);
+				callback(undefined);
 				return;
 			}
 

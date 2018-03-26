@@ -15,7 +15,7 @@ module.exports = {
 
 		// Get the setting params.
 		const settingName = command.galaxybot.escapeMentions(command.arguments.shift());
-		const settingValue = command.arguments[0] != undefined ? command.galaxybot.escapeMentions(command.arguments.join(" ")) : undefined;
+		const settingValue = command.arguments[0] != undefined ? command.galaxybot.escapeMentions(command.arguments.join(" "), command.message.mentions) : undefined;
 
 		// Edit the guild setting.
 		command.botGuild.editSetting(settingName, settingValue, command.galaxybot.config.settings[settingName], command.member).then(setting => {

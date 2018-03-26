@@ -1,16 +1,17 @@
-version:  "0.9.4"
-vdate:    "2018-03-22"
+version:  "0.9.5"
+vdate:    "2018-03-26"
 
 logfile:  log.txt
 github:   https://github.com/domino54/galaxybot
 dommy:    99612832353505280
+maxqueue: 1000
 
 discord:
   token:  your_token_here
 
 youtube:
   token:        your_token_here
-  maxplaylist:  100
+  maxplaylist:  1000
 
 facebook:
   appid:  your_application_id
@@ -33,7 +34,7 @@ settings:
   embed-mx:       true
   embed-titles:   true
   embed-maps:     true
-  max-duration:   600
+  max-duration:   1800
   unit-convert:   false
   stalk-edits:    false
   limit-access:   false

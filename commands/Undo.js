@@ -13,6 +13,27 @@ module.exports = {
 			return;
 		}
 
+		// Clear all timers created by adding a playlist.
+		var stoppedTimers = 0;
+
+		for (const timer of command.botGuild.pendingTimers) {
+			if (timer.senderID != command.user.id) continue;
+
+			clearTimeout(timer);
+			timer.stopped = true;
+			stoppedTimers++
+		}
+
+		// We cleared some timers.
+		if (stoppedTimers > 0) {
+			command.botGuild.pendingTimers = command.botGuild.pendingTimers.filter(timer => !timer.stopped);
+			command.botGuild.lastStop = Date.now();
+
+			command.channel.send(`I stopped adding **${stoppedTimers}** playlist items you've requested, ${command.user}.`);
+			command.botGuild.log(`Stopped adding ${stoppedTimers} items requested by ${command.user.tag}.`);
+			return;
+		}
+
 		var tracksToRemove = [];
 
 		// Remove all tracks requested by the user.
@@ -62,7 +83,6 @@ module.exports = {
 		for (const track of tracksToRemove) {
 			const index = command.botGuild.tracksQueue.indexOf(track);
 			command.botGuild.tracksQueue.splice(index, 1);
-			command.botGuild.uniqueTracks.splice(index, 1);
 		}
 	}
 }

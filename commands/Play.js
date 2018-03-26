@@ -1,5 +1,6 @@
 const Track = require("./../structures/Track.js");
 const URL = require("url");
+const youtubedl = require("youtube-dl");
 
 module.exports = {
 	name: "play",
@@ -20,6 +21,15 @@ module.exports = {
 		if (command.botGuild.voiceConnection && command.member.voiceChannel != command.botGuild.voiceConnection.channel && !command.botGuild.isGalaxyBotManager(command.member)) {
 			command.channel.send(`You need to join my voice channel if you want to request something, ${command.user}. :point_up:`);
 			command.botGuild.log("User not in voice channel with bot.");
+			return;
+		}
+
+		// Queue has reached the limit.
+		const maxQueueLength = !isNaN(command.galaxybot.config.maxqueue) ? command.galaxybot.config.maxqueue : 0;
+
+		if (maxQueueLength > 0 && command.botGuild.tracksQueue.length >= maxQueueLength) {
+			command.channel.send(`Sorry ${command.user}, but it looks like the music player queue has reached the **${maxQueueLength}** requests limit. :outbox_tray:`);
+			command.botGuild.log(`Music player queue full (${maxQueueLength}).`);
 			return;
 		}
 
@@ -144,11 +154,11 @@ module.exports = {
 
 					// YouTube is unavailable.
 					case "no results" :
-						errorMessage = `I couldn't find anything matching **${command.galaxybot.escapeMentions(query)}**, ${command.user}. :cry:`;
+						errorMessage = `I couldn't find anything matching **${command.galaxybot.escapeMentions(query, command.message)}**, ${command.user}. :cry:`;
 						break;
 					
 					// Unknown.
-					default : errorMessage = "An error has occured while I was searching on YouTube. If the problem persists, please contact my creator!";
+					default : errorMessage = `An error has occured while I was searching on YouTube. If the problem persists, please contact my creator!\n\`\`\`${error}\`\`\``;
 				}
 
 				command.channel.send(errorMessage);

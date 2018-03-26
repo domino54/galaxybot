@@ -43,7 +43,7 @@ module.exports = {
 
 		// User has no avatar.
 		if (!targetUser.avatarURL) {
-			command.channel.send(`Looks like \`${command.galaxybot.escapeMentions(targetUser.tag)}\` doesn't have avatar image. :thinking:`);
+			command.channel.send(`Looks like \`${command.galaxybot.escapeMentions(targetUser.tag, command.message.mentions)}\` doesn't have avatar image. :thinking:`);
 			command.botGuild.log(`${targetUser.tag} has no avatar image.`);
 			return;
 		} 

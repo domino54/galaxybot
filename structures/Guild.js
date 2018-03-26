@@ -52,7 +52,6 @@ class Guild {
 		// Tracks queue.
 		this.currentTrack = undefined;
 		this.tracksQueue = [];
-		this.uniqueTracks = [];
 		this.pendingTimers = [];
 		this.lastStop = 0;
 
@@ -110,6 +109,18 @@ class Guild {
 	 */
 	log(text) {
 		this.galaxybot.log(this, text);
+	}
+
+	/**
+	 * Get the color of the GalaxyBot highest role.
+	 *
+	 * @returns {number} The GalaxyBot color.
+	 */
+	get color() {
+		if (!this.guild) return undefined;
+
+		const member = this.guild.members.get(this.galaxybot.client.user.id);
+		return member && member.displayColor > 0 ? member.displayColor : undefined;
 	}
 
 	/**
@@ -197,7 +208,6 @@ class Guild {
 
 		// Pick first track from the queue.
 		this.currentTrack = this.tracksQueue.shift();
-		var trackUniqueID = this.uniqueTracks.shift();
 
 		// This can happen. Often.
 		if (this.voiceConnection === undefined) {
@@ -286,6 +296,10 @@ class Guild {
 		if (!member || (!this.voiceConnection && !member.voiceChannel)) return;
 		if (this.lastStop > 0 && Date.now() - this.lastStop < 1000) return; // Playlist spam prevention.
 
+		// Queue has reached the limit.
+		const maxQueueLength = !isNaN(this.galaxybot.config.maxqueue) ? this.galaxybot.config.maxqueue : 0;
+		if (maxQueueLength > 0 && this.tracksQueue.length >= maxQueueLength) return;
+
 		var errorMessage, hasPermissions = this.isGalaxyBotManager(member);
 
 		// Track options.
@@ -353,9 +367,19 @@ class Guild {
 		}
 
 		// The track already exists in the queue.
-		if (this.uniqueTracks.includes(track.uniqueID)) {
-			const position = this.uniqueTracks.indexOf(track.uniqueID) + 1;
-			if (!isSilent) this.lastTextChannel.send(`**${track.title}** is already **#${position}** in the queue, ${member}. You can request something else. :wink:`);
+		var alreadyAdded = -1;
+
+		for (var i = 0; i < this.tracksQueue.length; i++) {
+			const request = this.tracksQueue[i];
+
+			if (request.uniqueID != track.uniqueID) continue;
+
+			alreadyAdded = i;
+			break;
+		}
+
+		if (alreadyAdded >= 0) {
+			if (!isSilent) this.lastTextChannel.send(`**${track.title}** is already **#${alreadyAdded + 1}** in the queue, ${member}. You can request something else. :wink:`);
 			this.log(`Track "${track.title}" not added: exists in the queue with the same ID.`);
 			return;
 		}
@@ -364,6 +388,13 @@ class Guild {
 		if (track.isLivestream && !hasPermissions) {
 			if (!isSilent) this.lastTextChannel.send(`Sorry ${member}, you don't have permissions to add livestreams. :point_up:`);
 			this.log(`Track "${track.title}" not added: no permission to play livestream.`);
+			return;
+		}
+
+		// Track has unspecified duration.
+		if (!hasPermissions && track.duration <= 0) {
+			if (!isSilent) this.lastTextChannel.send(`Sorry ${member}, you don't have permissions to add requests with unspecified duration. :rolling_eyes:`);
+			this.log(`Track "${track.title}" not added: duration unspecified.`);
 			return;
 		}
 
@@ -389,17 +420,13 @@ class Guild {
 		if (isNext && hasPermissions) {
 			if (isNow) this.lastTextChannel.send(`Okay ${member}, let's play it right now! :smirk:`);
 			this.log("Track is forced next in the queue.");
-
 			this.tracksQueue.unshift(track);
-			this.uniqueTracks.unshift(track.uniqueID);
 		}
 
 		// No permissions to insert at the beginning of the queue.
 		else {
 			if (isNext) this.lastTextChannel.send(`Sorry ${member}, you can't queue ${track.type} next, nor play it immediately. :rolling_eyes:`);
-
 			this.tracksQueue.push(track);
-			this.uniqueTracks.push(track.uniqueID);
 		}
 
 		// Create a new voice connection, if there is none.
@@ -488,17 +515,25 @@ class Guild {
 					const videoURL = "https://www.youtube.com/watch?v=" + items[i].resourceId.videoId;
 					const delay = i * 100;
 
-					this.pendingTimers.push(setTimeout(() => {
+					let timer = setTimeout(() => {
 						var track = new Track(videoURL, member, track => {
 							this.onTrackCreated(track, member, videoURL, { silent: true });
 						});
-					}, delay));
+
+						timer.stopped = true;
+						this.pendingTimers = this.pendingTimers.filter(item => !item.stopped);
+					}, delay);
+
+					timer.senderID = member.id;
+					timer.stopped = false;
+
+					this.pendingTimers.push(timer);
 				}
 
 				resolve(items.length);
 			}).catch(error => {
 				console.log(error);
-				reject("playlist error");
+				reject(error);
 			});
 		});
 	}
@@ -664,14 +699,16 @@ class Guild {
 		if (matchingWords.length > 0) {
 			message.delete().then(() => {
 				this.log(`Deleted ${message.author.tag} message containing filtered phrases: ${matchingWords.join(", ")}.`);
-				return true;
 			})
 			.catch(error => {
 				this.log("Couldn't filter out a message: missing permissions.");
 				// console.log(error);
-				return false;
 			});
+
+			return true;
 		}
+
+		return false;
 	}
 
 	/**

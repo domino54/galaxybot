@@ -22,6 +22,15 @@ module.exports = {
 			return;
 		}
 
+		// Queue has reached the limit.
+		const maxQueueLength = !isNaN(command.galaxybot.config.maxqueue) ? command.galaxybot.config.maxqueue : 0;
+
+		if (maxQueueLength > 0 && command.botGuild.tracksQueue.length >= maxQueueLength) {
+			command.channel.send(`Sorry ${command.user}, but it looks like the music player queue has reached the **${maxQueueLength}** requests limit. :outbox_tray:`);
+			command.botGuild.log(`Music player queue full (${maxQueueLength}).`);
+			return;
+		}
+		
 		const order = parseInt(command.arguments[0]);
 		const channelId = command.arguments[1] ? command.arguments[1].match(/[0-9]+/) : false;
 		var targetChannel;

@@ -9,16 +9,17 @@ Reference: `command <mandatory> [optional]`.
 
 ### General
 
-| Command          | Description |
-|:----------------:| ----------- |
-| `about`          | Shows some details about the GalaxyBot.
-| `help [command]` | Sends a link to the commands reference or a description of the given command.
-| `dommy`          | Mention [`Dommy#7014`](https://github.com/domino54/) with a thinking GIF. 🤔
-| `git`            | Sends a link to the GitHub repository with source code of the GalaxyBot.
-| `invite`         | Sends a link, which allows the user to add GalaxyBot to their server.
-| `guilds`         | The number of guilds GalaxyBot is active in. Full list featuring guilds names is available only to the bot owner, through a direct message.
-| `avatar [name]`  | Sends you direct link to your or someone's avatar.
-| `time`           | Current time of the machine GalaxyBot is running on.
+| Command            | Description |
+|:------------------:| ----------- |
+| `about`            | Shows some details about the GalaxyBot.
+| `help [command]`   | Sends a link to the commands reference or a description of the given command.
+| `dommy`            | Mention [`Dommy#7014`](https://github.com/domino54/) with a thinking GIF. 🤔
+| `git`              | Sends a link to the GitHub repository with source code of the GalaxyBot.
+| `invite`           | Sends a link, which allows the user to add GalaxyBot to their server.
+| `guilds`           | The number of guilds GalaxyBot is active in. Full list featuring guilds names is available only to the bot owner, through a direct message.
+| `avatar [name]`    | Sends you direct link to your or someone's avatar.
+| `8ball [question]` | Ask the GalaxyBot a yes or no question, it knows the answer to everything.
+| `time`             | Current time of the machine GalaxyBot is running on.
 
 ### Moderation
 
@@ -52,6 +53,7 @@ Instead of using title `id` in commands you can use one of following short codes
 | `play <url\|query> [now\|next]` | Connects to a voice channel and plays audio from the given link. You can request videos from SoundCloud, Mixcloud, YouTube, Vimeo, Dailymotion, Facebook and Streamable, send direct link to a file or a YouTube playlist. If an invalid URL is given, GalaxyBot will search the phrase in YouTube and play the first playable result. `now` and `next` allow GalaxyBot managers to play the track instantly or insert it at the beginning of the queue. If an audio file is attached to the message, GalaxyBot will attempt to play it.
 | `playattachment [#] [channel]`  | Puts the latest audio file attachment sent in the channel in the queue. `#` can be used to determine which attachment should be played. Adding the `channel` parameter will search for an attachment in this particular channel.
 | `yt <query>`                    | Search for a YouTube video or playlist and add it to the music player queue.
+| `sc <query>`                    | Search for a SoundCloud track and add it to the music player queue.
 | `undo [quantity\|all]`          | Removes the latest track you've requested. Specify `quantity` to remove a certain number of tracks, or `all` to remove all your requests.
 | `now`                           | Shows what is currently being played.
 | `next [me\|order]`              | Shows details of the next request in the queue. `me` shows your first upcoming request. `order` can tell which request is at specific position in the queue.
@@ -72,7 +74,7 @@ Available GalaxyBot settings, which server administrators can tweak to customize
 | `embed-titles`    | `bool`        | `true`  | Detect and send ManiaPlanet titles links.
 | `embed-maps`      | `bool`        | `true`  | Detect and send ManiaPlanet maps links.
 | `music-cmd-ch`    | `slowflake[]` | `[]`    | The only channels, where music player commands are accepted.
-| `max-duration`    | `int`         | `600`   | Maximum duration (in seconds) of music tracks users without full permissions can play. `0` = no limit.
+| `max-duration`    | `int`         | `1800`  | Maximum duration (in seconds) of music tracks users without full permissions can play. `0` = no limit.
 | `limit-access`    | `bool`        | `false` | Disable music player commands for users without enough rights.
 | `stalk-edits`     | `bool`        | `false` | Mock members for editing their messages.
 | `enable-filter`   | `bool`        | `true`  | Enable or disable the words filtering feature of the GalaxyBot. Requires GalaxyBot to have the **Manage messages** permission in text channels for messages and roles filtering, as well as **Manage nicknames** for nicknames filtering.
