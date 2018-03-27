@@ -38,7 +38,7 @@ module.exports = {
 		*/
 
 		// Commands documentation.
-		command.channel.send(`You can find the full documentation of all my commands here, ${command.user}:\n${command.galaxybot.config.github}`);
+		command.channel.send(`You can find the full documentation of all my commands here, ${command.user}:\n${command.galaxybot.github}`);
 		command.botGuild.log("GalaxyBot documentation URL sent.");
 	}
 }

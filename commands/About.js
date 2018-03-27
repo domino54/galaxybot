@@ -14,7 +14,7 @@ module.exports = {
 			},
 			description:
 				"A Discord bot providing multiple integrations for Nadeo games in ManiaPlanet platform, capable of playing some music and doing other useless stuff. Sometimes behaves extremely impolitely, but that's just her nature.\n\n" +
-				`**[Documentation](${command.galaxybot.config.github})** • ` +
+				`**[Documentation](${command.galaxybot.github})** • ` +
 				`**[Add to your server](https://discordapp.com/oauth2/authorize?client_id=${command.galaxybot.client.user.id}&scope=bot&permissions=137456704)**`,
 			color: command.botGuild.color,
 			thumbnail: {
@@ -22,11 +22,11 @@ module.exports = {
 			},
 			fields: [{
 				name: "Version",
-				value: command.galaxybot.config.version,
+				value: command.galaxybot.version,
 				inline: true
 			}, {
 				name: "Updated at",
-				value: command.galaxybot.config.vdate,
+				value: command.galaxybot.vdate,
 				inline: true
 			}, {
 				name: "Active servers",

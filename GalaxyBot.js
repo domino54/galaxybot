@@ -3,6 +3,7 @@ const Discord = require("discord.js");
 const querystring = require("querystring");
 const yaml = require("js-yaml");
 const FB = require("fb");
+const pjson = require("./package.json");
 
 const https = require("https");
 const URL = require("url");
@@ -42,14 +43,19 @@ class GalaxyBot {
 		process.on("SIGBREAK", () => { this.end(); });
 
 		this.config = null;
-		this.isYouTubeAvailable = false;
+		this.version = pjson.version;
+		this.github = pjson.homepage;
+
 		this.activeGuilds = new Map();
 		this.activeUsers = new Map();
 		this.availableCommands = new Map();
+
+		this.isYouTubeAvailable = false;
 		this.logsStream = null;
 		this.statusesList = [];
 		this.lastStatus = false;
 		this.talkChannel = false;
+
 		this.start();
 	}
 
@@ -164,6 +170,16 @@ class GalaxyBot {
 		fs.readdirSync("./commands/").forEach(file => {
 			const command = require("./commands/" + file);
 			this.availableCommands.set(command.name, command);
+		});
+
+		// Get the version date.
+		fs.stat("./package.json", (error, stats) => {
+			if (error) {
+				console.log(error);
+				return;
+			}
+
+			this.vdate = stats.mtime.toISOString().split("T")[0];
 		});
 	}
 

@@ -837,7 +837,7 @@ class Guild {
 						const expression = new RegExp(escape(explode.join(" ")), "i");
 
 						var targetRole;
-						var currentRoles = this.settings.roles ? this.settings.roles : [];
+						var currentRoles = this.settings.roles || [];
 						
 						// Find a role with a matching name.
 						this.guild.roles.forEach((role, snowflake) => {
@@ -911,7 +911,7 @@ class Guild {
 						if (channelId) channelId = channelId[0];
 
 						var targetChannel;
-						var currentChannels = this.settings[settingName] ? this.settings[settingName] : [];
+						var currentChannels = this.settings[settingName] || [];
 						
 						// Find the channel with matching id.
 						this.guild.channels.forEach((channel, snowflake) => {
@@ -980,7 +980,7 @@ class Guild {
 						var action = explode.shift();
 
 						var targetWord = explode.join(" ");
-						var currentWords = this.settings[settingName] ? this.settings[settingName] : [];
+						var currentWords = this.settings[settingName] || [];
 
 						// Incorrect action given.
 						if (!action.match(/^add|remove$/)) {
@@ -1051,7 +1051,7 @@ class Guild {
 			}
 
 			// Get the current value. If not set, take the default value.
-			var currentValue = this.settings && this.settings[settingName] !== undefined ? this.settings[settingName] : defaultValue;
+			var currentValue = this.settings[settingName] || defaultValue;
 
 			// Format values of some settings into a readable form.
 			if (currentValue !== undefined) { 

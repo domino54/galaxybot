@@ -1,6 +1,6 @@
 {
   "name": "galaxybot",
-  "version": "0.4.0",
+  "version": "0.9.6",
   "description": "A Discord bot capable of playing some music and doing other stuff. Pretty cute, too.",
   "main": "index.js",
   "scripts": {
@@ -14,7 +14,10 @@
     "ManiaPlanet",
     "music"
   ],
-  "author": "Dommy",
+  "author": {
+    "name": "Dommy",
+    "url": "https://github.com/domino54"
+  },
   "license": "GPL-3.0",
   "bugs": {
     "url": "https://github.com/domino54/galaxybot/issues"
