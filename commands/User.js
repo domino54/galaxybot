@@ -2,17 +2,19 @@ const Discord = require("discord.js");
 
 module.exports = {
 	name: "user",
-	description: "Display some information about your profile or the profile of a specified member.",
+	description: "Display some information about your profile or the profile of a specific user.",
 
 	execute: command => {
 		let targetUser = command.user, targetMember = command.member;
 
 		// Find the matching member if in a guild and specified.
 		if (command.guild && command.arguments.length >= 1) {
+			const argument = command.galaxybot.escapeMentions(command.arguments.join(" "), command.message.mentions);
+
 			let matchingMembers = [];
 
 			// From a mention.
-			if (command.message.mentions.members) {
+			if (command.message.mentions.members != null && command.message.mentions.members.size > 0) {
 				command.message.mentions.members.forEach((member, memberID) => {
 					matchingMembers.push(member);
 				});
@@ -30,7 +32,6 @@ module.exports = {
 					return string.replace(/[-\/\\^$*+?.()|[\]{}]/g, "\\$&");
 				};
 
-				const argument = command.galaxybot.escapeMentions(command.arguments.join(" "), command.message.mentions);
 				const expression = new RegExp(escape(argument), "i");
 				const targetId = argument.match(/[0-9]+/);
 
