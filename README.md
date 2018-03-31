@@ -19,6 +19,8 @@ Reference: `command <mandatory> [optional]`.
 | `guilds`           | The number of guilds GalaxyBot is active in. Full list featuring guilds names is available only to the bot owner, through a direct message.
 | `avatar [name]`    | Sends you direct link to your or someone's avatar.
 | `user [name]`      | Display some information about your profile or the profile of a specific user.
+| `playing <game>`   | Current number of users seen by the GalaxyBot, which are playing the given `game`.
+| `oldest`           | Generate a Markdown file, containing a table listing all members of the server in order of the join time.
 | `8ball [question]` | Ask the GalaxyBot a yes or no question, it knows the answer to everything.
 | `time`             | Current time of the machine GalaxyBot is running on.
 

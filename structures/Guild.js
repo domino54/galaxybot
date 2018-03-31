@@ -59,7 +59,13 @@ class Guild {
 		this.latestTimeMinute = -1;
 		this.sameTimeStreak = 0;
 		this.lastServersUpdate = 0;
+
+		// Timeouts.
 		this.nextPurgeAllowed = 0;
+		this.nextOldestAllowed = 0;
+
+		// Browsers.
+		this.serverBrowsers = [];
 
 		// Guild settings file.
 		this.settings = new Object();
@@ -121,6 +127,55 @@ class Guild {
 
 		const member = this.guild.members.get(this.galaxybot.client.user.id);
 		return member && member.displayColor > 0 ? member.displayColor : undefined;
+	}
+
+	/**
+	 * Find a member by their username, nickname, ID or a mention.
+	 *
+	 * @param {string} string - The string to find the member by.
+	 * @param {MessageMentions} mentions - The mentions of the message.
+	 * @returns {GuildMember} The matching member.
+	 */
+	findMember(string, mentions) {
+		if (string.length <= 0) return undefined;
+
+		let matchingMembers = [];
+
+		// From a mention.
+		if (mentions.members && mentions.members.size > 0) {
+			mentions.members.forEach((member, memberID) => {
+				matchingMembers.push(member);
+			});
+		}
+
+		// Search.
+		else {
+			/**
+			 * Escape characters in regular expression.
+			 *
+			 * @param {string} string - The string to escape.
+			 * @returns {string} The escaped string.
+			 */
+			function escape(string) {
+				return string.replace(/[-\/\\^$*+?.()|[\]{}]/g, "\\$&");
+			};
+
+			const expression = new RegExp(escape(string), "i");
+			const targetId = string.match(/[0-9]+/);
+
+			// Find member of matching tag.
+			this.guild.members.forEach((member, memberId) => {
+				if (memberId == targetId || member.user.tag.match(expression) || member.displayName.match(expression)) {
+					matchingMembers.push(member);
+				}
+			});
+		}
+
+		// Found some members - return the first match.
+		if (matchingMembers[0]) return matchingMembers[0];
+
+		// Nobody has been found.
+		return undefined;
 	}
 
 	/**
@@ -491,6 +546,24 @@ class Guild {
 	}
 
 	/**
+	 * Check if there is a playlist being added, sent by the member.
+	 *
+	 * @param {GuildMember} member - Member to check.
+	 * @returns {boolean} `true`, if the member has an awaiting playlist.
+	 */
+	hasPendingPlaylist(member) {
+		if (typeof member !== "object") return 0;
+
+		var requests = 0;
+
+		for (const timer of this.pendingTimers) {
+			if (timer.senderID == member.id) requests++;
+		}
+
+		return requests;
+	}
+
+	/**
 	 * Load videos of a YouTube playlist as tracks.
 	 *
 	 * @param {string} playlistID - The YouTube playlist ID.
@@ -587,6 +660,11 @@ class Guild {
 
 					// Add first found playlist.
 					else if (result.kind === "youtube#playlist") {
+						if (this.hasPendingPlaylist(member) > 0) {
+							reject("pending playlist");
+							return;
+						}
+
 						this.loadPlaylist(result.id, member).then(nbItems => {
 							resolve(nbItems);
 						}).catch(error => {

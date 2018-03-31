@@ -11,51 +11,17 @@ module.exports = {
 		if (command.guild && command.arguments.length >= 1) {
 			const argument = command.galaxybot.escapeMentions(command.arguments.join(" "), command.message.mentions);
 
-			let matchingMembers = [];
-
-			// From a mention.
-			if (command.message.mentions.members != null && command.message.mentions.members.size > 0) {
-				command.message.mentions.members.forEach((member, memberID) => {
-					matchingMembers.push(member);
-				});
-			}
-
-			// Search.
-			else {
-				/**
-				 * Escape characters in regular expression.
-				 *
-				 * @param {string} string - The string to escape.
-				 * @returns {string} The escaped string.
-				 */
-				function escape(string) {
-					return string.replace(/[-\/\\^$*+?.()|[\]{}]/g, "\\$&");
-				};
-
-				const expression = new RegExp(escape(argument), "i");
-				const targetId = argument.match(/[0-9]+/);
-
-				// Find member of matching tag.
-				command.guild.members.forEach((member, memberId) => {
-					if (memberId == targetId || member.user.tag.match(expression) || member.displayName.match(expression)) {
-						matchingMembers.push(member);
-					}
-				});
-			}
-
-			// Found someone.
-			for (const member of matchingMembers) {
-				targetUser = member.user;
-				targetMember = member;
-				break;
-			}
+			// Find the target user.
+			targetMember = command.botGuild.findMember(argument, command.message.mentions);
 			
-			// No users found.
-			if (matchingMembers.length <= 0) {
+			// User not found.
+			if (!targetMember) {
 				command.channel.send(`Sorry ${command.user}, I couldn't find the user **${argument}** on this server. :rolling_eyes:`);
 				command.botGuild.log(`Could not find user "${argument}".`);
 				return;
 			}
+
+			targetUser = targetMember.user;
 		}
 
 		/**
@@ -107,7 +73,7 @@ module.exports = {
 
 			targetMember.roles.forEach((role, roleID) => {
 				if (role.calculatedPosition <= 0) return;
-				roles.push(`${role}`);
+				roles.push(role.name);
 			});
 
 			// Show the roles of that person.

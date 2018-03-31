@@ -578,7 +578,7 @@ class GalaxyBot {
 				const mxid = link.split("/").pop();
 				const site = link.substring(0, 2);
 
-				guild.log(`Detected Mania Exchange map: "${mapUid}" in ${site}.`);
+				guild.log(`Detected Mania Exchange map: "${mxid}" in ${site}.`);
 				
 				ManiaExchange.maps(site, [mxid], mapInfo => {
 					if (!mapInfo || mapInfo.length <= 0) return;
@@ -641,9 +641,14 @@ class GalaxyBot {
 	 * @param {User} user - The user, who added their reaction.
 	 */
 	onNewReaction(reaction, user) {
-		if (!reaction || !user) return;
+		if (!reaction || !user || user.id == this.client.user.id) return;
 
-		var guild = this.getGalaxyBotGuild(reaction.message.guild);
+		const guild = this.getGalaxyBotGuild(reaction.message.guild);
+
+		// Navigate through server browsers.
+		for (const browser of guild.serverBrowsers) {
+			browser.onReaction(reaction, user);
+		}
 
 		// Filter the reaction.
 		if (guild.getSetting("enable-filter") === true) {

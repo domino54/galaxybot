@@ -15,6 +15,8 @@ class User {
 		this.galaxybot = galaxybot;
 		this.type = "user";
 
+		this.serverBrowsers = [];
+
 		this.annoyanceTimestamp = 0; ///< Later computed into annoyance level
 		this.warnedForJoyEmoji = false;
 

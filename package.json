@@ -1,6 +1,6 @@
 {
   "name": "galaxybot",
-  "version": "0.9.6",
+  "version": "0.9.8",
   "description": "A Discord bot capable of playing some music and doing other stuff. Pretty cute, too.",
   "main": "index.js",
   "scripts": {

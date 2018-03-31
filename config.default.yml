@@ -1,6 +1,7 @@
-logfile:  log.txt
-dommy:    99612832353505280
-maxqueue: 1000
+logfile:      log.txt
+dommy:        99612832353505280
+maxqueue:     1000
+maxbrowsers:  10
 
 discord:
   token:  your_token_here

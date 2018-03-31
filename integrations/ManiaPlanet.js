@@ -28,7 +28,8 @@ const commonTitles = {
 	"stormium": "GEs@guerro",
 	"infection": "infection@dmark",
 	"speedball": "SpeedBall@steeffeen",
-	"alpine": "TMOneAlpine@florenzius"
+	"alpine": "TMOneAlpine@florenzius",
+	"speed": "TMOneSpeed@florenzius"
 };
 
 // Write complete ManiaPlanet node SDK?

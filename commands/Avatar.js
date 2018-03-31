@@ -8,42 +8,26 @@ module.exports = {
 		var targetUser = command.user;
 		var userColor = command.guild ? command.member.displayColor : undefined;
 
+		// Find the matching member if in a guild and specified.
 		if (command.guild && command.arguments.length >= 1) {
-			function escape(string) {
-				return string.replace(/[-\/\\^$*+?.()|[\]{}]/g, "\\$&");
-			};
+			const argument = command.galaxybot.escapeMentions(command.arguments.join(" "), command.message.mentions);
 
-			const argument = command.galaxybot.escapeMentions(command.arguments.join(" "));
-			const expression = new RegExp(escape(argument), "i");
-			const targetId = argument.match(/[0-9]+/);
-			var matchingMembers = [];
-
-			// Find member of matching tag.
-			command.guild.members.forEach((member, memberId) => {
-				if (memberId == targetId || member.user.tag.match(expression) || member.displayName.match(expression)) {
-					matchingMembers.push(member);
-				}
-			});
-
-			// Found someone.
-			if (matchingMembers.length > 0) {
-				const member = matchingMembers[0];
-
-				targetUser = member.user;
-				userColor = member.displayColor > 0 ? member.displayColor : undefined;
-			}
+			// Find the target user.
+			let targetMember = command.botGuild.findMember(argument, command.message.mentions);
 			
-			// No users found.
-			else {
+			// User not found.
+			if (!targetMember) {
 				command.channel.send(`Sorry ${command.user}, I couldn't find the user **${argument}** on this server. :rolling_eyes:`);
 				command.botGuild.log(`Could not find user "${argument}".`);
 				return;
 			}
+
+			targetUser = targetMember.user;
 		}
 
 		// User has no avatar.
-		if (!targetUser.avatarURL) {
-			command.channel.send(`Looks like \`${command.galaxybot.escapeMentions(targetUser.tag, command.message.mentions)}\` doesn't have avatar image. :thinking:`);
+		if (targetUser.avatarURL) {
+			command.channel.send(`Looks like \`${targetUser.tag.replace(/`/g, "")}\` doesn't have avatar image. :thinking:`);
 			command.botGuild.log(`${targetUser.tag} has no avatar image.`);
 			return;
 		} 

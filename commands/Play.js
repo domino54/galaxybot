@@ -96,6 +96,15 @@ module.exports = {
 
 		// Load YouTube playlist.
 		else if (ytlist) {
+			let pendingRequests = command.botGuild.hasPendingPlaylist(command.member);
+
+			// User already has a playlist being added.
+			if (pendingRequests > 0) {
+				command.channel.send(`I'm already processing a playlist sent by you, ${command.user}. Please wait until I'm done with **${pendingRequests}** remaining requests, or use the \`undo\` command!`);
+				command.botGuild.log(`Already processing playlist requested by ${command.user.tag}.`);
+				return;
+			}
+
 			const playlistURL = ytlist[0];
 			const playlistID = playlistURL.match(/[\w-]+$/)[0];
 			
@@ -156,6 +165,13 @@ module.exports = {
 					case "no results" :
 						errorMessage = `I couldn't find anything matching **${command.galaxybot.escapeMentions(query, command.message)}**, ${command.user}. :cry:`;
 						break;
+
+					// User already has a pending playlist.
+					case "pending playlist" : {
+						let pendingRequests = command.botGuild.hasPendingPlaylist(command.member);
+						errorMessage = `I'm already processing a playlist sent by you, ${command.user}. Please wait until I'm done with **${pendingRequests}** remaining requests, or use the \`undo\` command!`;
+						break;
+					}
 					
 					// Unknown.
 					default : errorMessage = `An error has occured while I was searching on YouTube. If the problem persists, please contact my creator!\n\`\`\`${error}\`\`\``;

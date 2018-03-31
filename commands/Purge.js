@@ -43,31 +43,15 @@ module.exports = {
 		const nbToDelete = clamp(parseInt(command.arguments.shift()), 1, 100);
 		var targetMember, deletedMessages = 0;
 
-		// Find the user to PURGE.
+		// Find the user to PURGE their messages.
 		if (command.arguments.length > 0) {
-			function escape(string) {
-				return string.replace(/[-\/\\^$*+?.()|[\]{}]/g, "\\$&");
-			};
+			const argument = command.galaxybot.escapeMentions(command.arguments.join(" "), command.message.mentions);
 
-			const argument = command.galaxybot.escapeMentions(command.arguments.join(" "));
-			const expression = new RegExp(escape(argument), "i");
-			const targetId = argument.match(/[0-9]+/);
-			var matchingMembers = [];
-
-			// Find member of matching tag.
-			command.guild.members.forEach((member, memberId) => {
-				if (memberId == targetId || member.user.tag.match(expression) || member.displayName.match(expression)) {
-					matchingMembers.push(member);
-				}
-			});
-
-			// Found someone.
-			if (matchingMembers.length > 0) {
-				targetMember = matchingMembers.shift();
-			}
+			// Find the target user.
+			targetMember = command.botGuild.findMember(argument, command.message.mentions);
 			
-			// No users found.
-			else {
+			// User not found.
+			if (!targetMember) {
 				command.channel.send(`Sorry ${command.user}, I couldn't find the user **${argument}** on this server. :rolling_eyes:`);
 				command.botGuild.log(`Could not find user "${argument}".`);
 				return;

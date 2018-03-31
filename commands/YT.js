@@ -54,6 +54,13 @@ module.exports = {
 				case "no results" :
 					errorMessage = `I couldn't find anything matching **${command.galaxybot.escapeMentions(query, command.message.mentions)}**, ${command.user}. :cry:`;
 					break;
+
+				// User already has a pending playlist.
+				case "pending playlist" : {
+					let pendingRequests = command.botGuild.hasPendingPlaylist(command.member);
+					errorMessage = `I'm already processing a playlist sent by you, ${command.user}. Please wait until I'm done with **${pendingRequests}** remaining requests, or use the \`undo\` command!`;
+					break;
+				}
 				
 				// Unknown.
 				default : errorMessage = `An error has occured while I was searching on YouTube. If the problem persists, please contact my creator!\n\`\`\`${error}\`\`\``;
