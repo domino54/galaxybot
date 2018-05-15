@@ -13,9 +13,16 @@ module.exports = {
 		}
 
 		// Prepare the answer.
-		var question = command.galaxybot.escapeMentions(command.arguments.join(" "), command.message.mentions).replace(/`/g, "");
-		var answers = ["Very unlikely...", "Absolutely not.", "Rather not.", "Ewww... no.", "I don't think so.", "Just no.", "Yes!", "Most likely!", "Yeah, pretty much!", "Without a doubt!", "Yes, definitely!", "Very probable!"];
-		var answer = answers[Math.floor(Math.random() * answers.length)];
+		let question = command.galaxybot.escapeMentions(command.arguments.join(" "), command.message.mentions).replace(/`/g, "");
+		let debug = question.toLowerCase().replace(/\W/g, ""), numericValue = 0;
+
+		for (let i = 0; i < debug.length; i++) {
+			numericValue += debug.charCodeAt(i);
+		}
+
+		// Prepare the answer
+		const answers = ["Ewww... no.", "Absolutely not.", "Rather not.", "Very unlikely...", "I don't think so.", "Most likely!", "Very probable!", "Yes!", "Without a doubt!", "Yeah, pretty much!", "Yes, definitely!", "Just no."];
+		let answer = answers[numericValue % answers.length];
 
 		// Escape custom emoji.
 		question = question.replace(/<:|<a:/g, "");

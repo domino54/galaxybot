@@ -26,7 +26,7 @@ module.exports = {
 		}
 
 		// User has no avatar.
-		if (targetUser.avatarURL) {
+		if (!targetUser.avatarURL) {
 			command.channel.send(`Looks like \`${targetUser.tag.replace(/`/g, "")}\` doesn't have avatar image. :thinking:`);
 			command.botGuild.log(`${targetUser.tag} has no avatar image.`);
 			return;

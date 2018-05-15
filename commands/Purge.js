@@ -28,9 +28,12 @@ module.exports = {
 			return;
 		}
 
+		// Get the number of messages to delete.
+		const parsedNumber = command.arguments[0] ? parseInt(command.arguments.shift()) : 0;
+
 		// Number of messages not specified.
-		if (command.arguments.length < 1) {
-			command.channel.send(`Sorry ${command.user}, but you have to tell me how many messages do you want me to remove (between 1 and 100).`);
+		if (parsedNumber < 1) {
+			command.channel.send(`Sorry ${command.user}, but you have to tell me how many messages do you want me to remove (between 1 and 50).`);
 			command.botGuild.log("Messages quantity not specified.");
 			return;
 		}
@@ -40,7 +43,7 @@ module.exports = {
 		}
 
 		// Get the number of messages to delete.
-		const nbToDelete = clamp(parseInt(command.arguments.shift()), 1, 100);
+		const nbToDelete = clamp(parsedNumber, 1, 50);
 		var targetMember, deletedMessages = 0;
 
 		// Find the user to PURGE their messages.
@@ -65,7 +68,7 @@ module.exports = {
 
 		// Destroy the stuff.
 		function fetch(message) {
-			command.channel.fetchMessages({ limit: (targetMember ? 100 : nbToDelete), before: message.id }).then(messages => {
+			command.channel.fetchMessages({ limit: (targetMember ? 50 : nbToDelete), before: message.id }).then(messages => {
 				var i = 0;
 
 				messages.forEach((message, messageId) => {

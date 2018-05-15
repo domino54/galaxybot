@@ -23,7 +23,8 @@ const availableSettings = new Map([
 	["filter-admins",	"Whether the word filter should work on administrators and GalaxyBot managers."],
 	["text-responses",	"Let GalaxyBot react with some preprogrammed responses to messages."],
 	["mocking-joy",		"Make fun of people, who tend to overuse the 😂 joy emoji."],
-	["servers-status",	"Text channel, where GalaxyBot will post and update statuses of selected ManiaPlanet servers, added using the `addserver` command. Up to 10 latest messages sent in the channel will show a status below them."]
+	["servers-status",	"Text channel, where GalaxyBot will post and update statuses of selected ManiaPlanet servers, added using the `addserver` command. Up to 10 latest messages sent in the channel will show a status below them."],
+	["ignored-users",	"Members to be completely ignored by the bot. GalaxyBot managers bypass this restriction."]
 ]);
 
 /**
@@ -142,7 +143,7 @@ class Guild {
 		let matchingMembers = [];
 
 		// From a mention.
-		if (mentions.members && mentions.members.size > 0) {
+		if (mentions && mentions.members && mentions.members.size > 0) {
 			mentions.members.forEach((member, memberID) => {
 				matchingMembers.push(member);
 			});
@@ -150,17 +151,7 @@ class Guild {
 
 		// Search.
 		else {
-			/**
-			 * Escape characters in regular expression.
-			 *
-			 * @param {string} string - The string to escape.
-			 * @returns {string} The escaped string.
-			 */
-			function escape(string) {
-				return string.replace(/[-\/\\^$*+?.()|[\]{}]/g, "\\$&");
-			};
-
-			const expression = new RegExp(escape(string), "i");
+			const expression = new RegExp(this.galaxybot.regexEscape(string), "i");
 			const targetId = string.match(/[0-9]+/);
 
 			// Find member of matching tag.
@@ -203,6 +194,19 @@ class Guild {
 		for (const roleId of this.settings.roles) {
 			if (member.roles.has(roleId)) return true;
 		}
+	}
+
+	/**
+	 * Check if a member is ignored bu the GalaxyBot.
+	 *
+	 * @param {GuildMember} member - The member to check.
+	 * @returns {boolean} `true`, if member is ignored by GalaxyBot, `false` otherwise.
+	 */
+	isIgnored(member) {
+		if (!member || this.isGalaxyBotManager(member)) return false;
+		if (!this.settings || !this.settings["ignored-users"]) return false;
+
+		return this.settings["ignored-users"].includes(member.id);
 	}
 
 	createRolesList() {
@@ -718,6 +722,7 @@ class Guild {
 					}
 					
 					const serverInfo = response[0];
+					if (!serverInfo) return;
 					
 					ManiaPlanet.title(serverInfo.title, titleInfo => {
 						message.edit(message.content, ManiaPlanet.createServerEmbed(serverInfo, titleInfo));
@@ -1105,6 +1110,63 @@ class Guild {
 
 						break;
 					}
+
+					// Users ignored by the GalaxyBot.
+					case "ignored-users" : {
+						var explode = settingValue.split(" ");
+						var action = explode.shift();
+						
+						var targetMember = this.findMember(explode.join(" "));
+						var currentUsers = this.settings[settingName] || [];
+
+						// Remove members, which don't exist anymore.
+						currentUsers = currentUsers.filter(userID => this.guild.members.has(userID));
+
+						// Incorrect action given.
+						if (!action.match(/^add|remove$/)) {
+							reject("incorrect action");
+							return;
+						}
+
+						// Member not found in the guild.
+						if (!targetMember) {
+							reject("undefined member");
+							return;
+						}
+
+						// Add a new member.
+						if (action == "add") {
+							if (currentUsers.includes(targetMember.id)) {
+								reject("member already set");
+								return;
+							}
+
+							if (currentUsers.length >= 20) {
+								reject("too many members");
+								return;
+							}
+							
+							currentUsers.push(targetMember.id);
+						}
+
+						// Remove an existing member.
+						if (action == "remove") {
+							if (!currentUsers.includes(targetMember.id)) {
+								reject("member not set");
+								return;
+							}
+							
+							currentUsers.splice(currentUsers.indexOf(targetMember.id), 1);
+						}
+
+						// Set the new value.
+						if (currentUsers.length > 0) settingValue = currentUsers;
+
+						// An empty array is unwanted.
+						else settingValue = undefined;
+
+						break;
+					}
 				}
 
 				// Delete the property, if matches the default value.
@@ -1129,7 +1191,7 @@ class Guild {
 			}
 
 			// Get the current value. If not set, take the default value.
-			var currentValue = this.settings[settingName] || defaultValue;
+			var currentValue = this.settings[settingName] !== undefined ? this.settings[settingName] : defaultValue;
 
 			// Format values of some settings into a readable form.
 			if (currentValue !== undefined) { 
@@ -1175,6 +1237,19 @@ class Guild {
 						}
 
 						currentValue = filteredWords.join(", ");
+
+						break;
+					}
+
+					// Users ignored by the GalaxyBot.
+					case "ignored-users" : {
+						var usersTags = [];
+
+						for (const userID of currentValue) {
+							if (this.guild.members.has(userID)) usersTags.push("<@" + userID + ">");
+						}
+
+						currentValue = usersTags.join(", ");
 
 						break;
 					}

@@ -12,7 +12,7 @@ Reference: `command <mandatory> [optional]`.
 | Command            | Description |
 |:------------------:| ----------- |
 | `about`            | Shows some details about the GalaxyBot.
-| `help [command]`   | Sends a link to the commands reference or a description of the given command.
+| `help [command]`   | List the available GalaxyBot commands or sends the description of the given command.
 | `dommy`            | Mention [`Dommy#7014`](https://github.com/domino54/) with a thinking GIF. 🤔
 | `git`              | Sends a link to the GitHub repository with source code of the GalaxyBot.
 | `invite`           | Sends a link, which allows the user to add GalaxyBot to their server.
@@ -21,8 +21,10 @@ Reference: `command <mandatory> [optional]`.
 | `user [name]`      | Display some information about your profile or the profile of a specific user.
 | `playing <game>`   | Current number of users seen by the GalaxyBot, which are playing the given `game`.
 | `oldest`           | Generate a Markdown file, containing a table listing all members of the server in order of the join time.
-| `8ball [question]` | Ask the GalaxyBot a yes or no question, it knows the answer to everything.
+| `8ball <question>` | Ask the GalaxyBot a yes or no question, it knows the answer to everything.
 | `time`             | Current time of the machine GalaxyBot is running on.
+| `emoji <emoji>`    | Shows detailed information about an emoji exising in the server.
+| `reorder [#]`      | The most pointless command, which shuffles the order of all words in the previously sent message, because reasons.
 
 ### Moderation
 
@@ -30,6 +32,7 @@ Reference: `command <mandatory> [optional]`.
 |:-------------------------:| ----------- |
 | `settings <name> [value]` | Manage the GalaxyBot settings in the server. Anyone can view the bot settings, however only the GalaxyBot managers can edit them. See the [settings list](#Settings) below for more information.
 | `purge <count> [user]`    | Removes up to 100 messages in current text channel. Requires both the sender and GalaxyBot to have **Manage messages** permissions in the channel. `user` can be specified to delete messages of a specific user.
+| `rename <name>`           | Changes the name of GalaxyBot in the server.
 
 ### ManiaPlanet
 
@@ -86,6 +89,7 @@ Available GalaxyBot settings, which server administrators can tweak to customize
 | `text-responses`  | `bool`        | `true`  | Let GalaxyBot react with some preprogrammed responses to messages.
 | `mocking-joy`     | `bool`        | `true`  | Make fun of people, who tend to overuse the 😂 joy emoji.
 | `servers-status`  | `snowflake`   | `null`  | Text channel, where GalaxyBot will post and update statuses of selected ManiaPlanet servers, added using the `addserver` command. Up to 10 latest messages sent in the channel will show a status below them.
+| `ignored-users`   | `snowflake[]` | `[]`    | Members to be completely ignored by the bot. GalaxyBot managers bypass this restriction.
 
 Settings with array type require `add` and `remove` keywords, for example `!setings music-cmd-ch add #music-bot`.
 

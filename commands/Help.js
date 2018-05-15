@@ -2,7 +2,8 @@ const Discord = require("discord.js");
 
 module.exports = {
 	name: "help",
-	description: "Sends a link to the commands reference or a description of the given command.",
+	description: "List the available GalaxyBot commands or sends the description of the given command.",
+	// description: "Sends a link to the commands reference or a description of the given command.",
 
 	execute: command => {
 		if (command.arguments[0]) {
@@ -27,7 +28,6 @@ module.exports = {
 			return;
 		}
 
-		/*
 		var commands = [];
 		command.galaxybot.availableCommands.forEach((commandModel, commandName) => {
 			if (commandModel.hidden === true) return;
@@ -35,10 +35,9 @@ module.exports = {
 		});
 
 		command.channel.send("List of my currently available commands: ```" + commands.join(", ") + "```");
-		*/
-
+		
 		// Commands documentation.
-		command.channel.send(`You can find the full documentation of all my commands here, ${command.user}:\n${command.galaxybot.github}`);
-		command.botGuild.log("GalaxyBot documentation URL sent.");
+		// command.channel.send(`You can find the full documentation of all my commands here, ${command.user}:\n${command.galaxybot.github}`);
+		// command.botGuild.log("GalaxyBot documentation URL sent.");
 	}
 }

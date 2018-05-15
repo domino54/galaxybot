@@ -145,6 +145,7 @@ class ServerBrowser {
 
 					setTimeout(() => { message.react("◀"); }, 250);
 					setTimeout(() => { message.react("▶"); }, 500);
+					setTimeout(() => { message.react("🔄"); }, 725);
 
 					this.isActive = true;
 					this.message = message;
@@ -206,6 +207,11 @@ class ServerBrowser {
 			// Next page.
 			case "▶" :
 				this.nextPage();
+				break;
+
+			// Update.
+			case "🔄" :
+				this.update();
 				break;
 
 			// Ignore other reactions.

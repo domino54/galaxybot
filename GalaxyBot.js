@@ -278,6 +278,85 @@ class GalaxyBot {
 	}
 
 	/**
+	 * Escape characters in regular expression.
+	 *
+	 * @param {string} string - The string to escape.
+	 * @returns {string} The escaped string.
+	 */
+	regexEscape(string) {
+		return string.replace(/[-\/\\^$*+?.()|[\]{}]/g, "\\$&");
+	};
+
+	/**
+	 * Find an user by their username, ID or a mention.
+	 *
+	 * @param {string} string - The string to find the user by.
+	 * @param {MessageMentions} mentions - The mentions of the message.
+	 * @returns {User} The matching user.
+	 */
+	findUser(string, mentions) {
+		if (string.length <= 0) return undefined;
+
+		let matchingUsers = [];
+
+		// From a mention.
+		if (mentions && mentions.users && mentions.users.size > 0) {
+			mentions.users.forEach((user, userID) => {
+				matchingUsers.push(user);
+			});
+		}
+
+		// Search.
+		else {
+			const expression = new RegExp(this.regexEscape(string), "i");
+			const targetID = string.match(/[0-9]+/);
+
+			// Find user of matching tag.
+			this.client.users.forEach((user, userID) => {
+				if (userID == targetID || user.tag.match(expression) || user.username.match(expression)) {
+					matchingUsers.push(user);
+				}
+			});
+		}
+
+		// Found some users - return the first match.
+		if (matchingUsers[0]) return matchingUsers[0];
+
+		// Nobody has been found.
+		return undefined;
+	}
+
+	/**
+	 * Format a date into a readable format.
+	 *
+	 * @param {Date} date - The date to format.
+	 * @returns {string} The formatted date.
+	 */
+	formatDate(date) {
+		if (!date instanceof Date) return "Invalid date";
+
+		/**
+		 * Append precending zeroes to an integer.
+		 *
+		 * @param {number} num - The integer to format.
+		 * @param {number} length - The target length of the string.
+		 * @returns {string} The formatted integer.
+		 */
+		function formatInt(num, length) {
+			let string = Math.floor(num).toString();
+			while (string.length < length) string = "0" + string;
+			return string;
+		}
+
+		const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+		let daysSince = Math.floor((Date.now() - date.getTime()) / 86400000);
+
+		return date.getUTCDate() + " " + months[date.getUTCMonth()] + " " + date.getUTCFullYear() + ", " +
+			formatInt(date.getUTCHours(), 2) + ":" + formatInt(date.getUTCMinutes(), 2) + "\n" +
+			"(" + (daysSince > 0 ? (daysSince > 1 ? `${daysSince} days ago` : "Yesterday") : "Today") + ")";
+	}
+
+	/**
 	 * New, improved commands handling.
 	 *
 	 * @param {PendingCommand} command - The command that's been sent.
@@ -343,7 +422,7 @@ class GalaxyBot {
 
 		// Super advanced, 100% working crash prevention for commands.
 		catch (error) {
-			command.channel.send("An error has occured while executing the command. Please contact my creator if this problem persists! ```" + error + "```");
+			command.channel.send(`An error has occured while executing the **${command.name}** command. Please contact my creator if this problem persists! \`\`\`${error}\`\`\``);
 		}
 	}
 
@@ -504,6 +583,9 @@ class GalaxyBot {
 		var botUser = this.getGalaxyBotUser(message.author);
 
 		const guild = botGuild ? botGuild : botUser;
+
+		// User is ignored by the GalaxyBot.
+		if (botGuild && guild.isIgnored(message.member)) return;
 		
 		// Delete messages with filtered words.
 		if (message.guild && guild.filterMessage(message)) return;

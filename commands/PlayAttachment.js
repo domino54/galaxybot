@@ -50,7 +50,7 @@ module.exports = {
 		// Default to the channel command was sent in.
 		if (targetChannel === undefined) targetChannel = command.channel;
 
-		targetChannel.fetchMessages({ limit: 100 }).then(messages => {
+		targetChannel.fetchMessages({ limit: 50 }).then(messages => {
 			var nbAttachments = 0;
 			var attachmentURL = false;
 

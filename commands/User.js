@@ -5,67 +5,55 @@ module.exports = {
 	description: "Display some information about your profile or the profile of a specific user.",
 
 	execute: command => {
-		let targetUser = command.user, targetMember = command.member;
+		let targetUser = command.user, targetMember = command.member, argument;
+		const extendedSearch = command.user.id == command.galaxybot.config.dommy;
 
-		// Find the matching member if in a guild and specified.
-		if (command.guild && command.arguments.length >= 1) {
-			const argument = command.galaxybot.escapeMentions(command.arguments.join(" "), command.message.mentions);
-
-			// Find the target user.
-			targetMember = command.botGuild.findMember(argument, command.message.mentions);
-			
-			// User not found.
-			if (!targetMember) {
-				command.channel.send(`Sorry ${command.user}, I couldn't find the user **${argument}** on this server. :rolling_eyes:`);
-				command.botGuild.log(`Could not find user "${argument}".`);
-				return;
-			}
-
-			targetUser = targetMember.user;
+		if (command.arguments.length >= 1) {
+			argument = command.galaxybot.escapeMentions(command.arguments.join(" "), command.message.mentions);
 		}
 
-		/**
-		 * Format a date into a readable format.
-		 *
-		 * @param {Date} date - The date to format.
-		 * @returns {string} The formatted date.
-		 */
-		function formatDate(date) {
-			if (!date instanceof Date) return "Invalid date";
+		// User search.
+		if (argument) {
+			// Find the matching member if in a guild and specified.
+			if (command.guild) {
+				targetUser = undefined;
+				targetMember = command.botGuild.findMember(argument, command.message.mentions);
 
-			/**
-			 * Append precending zeroes to an integer.
-			 *
-			 * @param {number} num - The integer to format.
-			 * @param {number} length - The target length of the string.
-			 * @returns {string} The formatted integer.
-			 */
-			function formatInt(num, length) {
-				let string = Math.floor(num).toString();
-				while (string.length < length) string = "0" + string;
-				return string;
+				if (targetMember) targetUser = targetMember.user;
+
+				// User not found.
+				if (targetMember === undefined && !extendedSearch) {
+					command.channel.send(`Sorry ${command.user}, I couldn't find the user **${argument}** on this server. :rolling_eyes:`);
+					command.botGuild.log(`Could not find user "${argument}".`);
+					return;
+				}
 			}
 
-			const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
-			let daysSince = Math.floor((Date.now() - date.getTime()) / 86400000);
+			// Owner only: find any user.
+			if (extendedSearch) {
+				targetUser = command.galaxybot.findUser(argument, command.message.mentions);
+			}
+		}
 
-			return date.getUTCDate() + " " + months[date.getUTCMonth()] + " " + date.getUTCFullYear() + ", " +
-				formatInt(date.getUTCHours(), 2) + ":" + formatInt(date.getUTCMinutes(), 2) + "\n" +
-				"(" + (daysSince > 0 ? (daysSince > 1 ? `${daysSince} days ago` : "Yesterday") : "Today") + ")";
+		// User not found.
+		if (targetUser === undefined) {
+			command.channel.send(`Sorry ${command.user}, I couldn't find the user **${argument}**. :rolling_eyes:`);
+			command.botGuild.log(`Could not find user "${argument}".`);
+			return;
 		}
 
 		// Initialize fields array with a creation date.
 		let fields = [{
 			name: (targetUser.bot ? "Created at" : "Discord user since"),
-			value: formatDate(targetUser.createdAt),
+			value: command.galaxybot.formatDate(targetUser.createdAt),
 			inline: true
 		}];
 
+		// If member of a guild, show how long the person is a member.
 		if (targetMember) {
-			// If member of a guild, show how long the person is a member.
 			fields.push({
 				name: "Server member since",
-				value: formatDate(targetMember.joinedAt),
+				value: command.galaxybot.formatDate(targetMember.joinedAt),
 				inline: true
 			});
 
@@ -73,7 +61,7 @@ module.exports = {
 
 			targetMember.roles.forEach((role, roleID) => {
 				if (role.calculatedPosition <= 0) return;
-				roles.push(role.name);
+				roles.push(`${role}`);
 			});
 
 			// Show the roles of that person.
@@ -102,5 +90,7 @@ module.exports = {
 				text: "ID: " + targetUser.id
 			}
 		}));
+
+		command.botGuild.log("Showing user information: " + targetUser.tag);
 	}
 }
