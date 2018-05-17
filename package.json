@@ -1,6 +1,6 @@
 {
   "name": "galaxybot",
-  "version": "0.9.10",
+  "version": "0.9.11",
   "description": "A Discord bot capable of playing some music and doing other stuff. Pretty cute, too.",
   "main": "index.js",
   "scripts": {
@@ -26,13 +26,13 @@
   "dependencies": {
     "discord.js": "^11.3.2",
     "fb": "^2.0.0",
-    "js-yaml": "^3.11.0",
-    "music-metadata": "^0.9.8",
-    "node-opus": "^0.2.7",
-    "querystring": "^0.2.0",
+    "html-markdown": "^1.0.17",
+    "jsdom": "^11.10.0",
+    "music-metadata": "^1.0.0",
+    "node-opus": "^0.3.0",
     "youtube-dl": "^1.12.2",
     "youtube-playlist-info": "^1.1.2",
-    "youtube-search": "^1.0.10",
-    "ytdl-core": "^0.20.2"
+    "youtube-search": "^1.1.0",
+    "ytdl-core": "^0.20.4"
   }
 }

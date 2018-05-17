@@ -18,6 +18,7 @@ const PendingCommand = require("./structures/PendingCommand.js");
 // Integrations.
 const ManiaPlanet = require("./integrations/ManiaPlanet.js");
 const ManiaExchange = require("./integrations/ManiaExchange.js");
+const MPForum = require("./integrations/MPForum.js");
 
 /**
  * The GalaxyBot itself.
@@ -209,7 +210,7 @@ class GalaxyBot {
 	 * Fired when terminal or console is killed.
 	 */
 	end() {
-		this.log(false, "Stopping GalaxyGot...");
+		this.log(false, "Stopping GalaxyBot...");
 		this.client.destroy();
 
 		// Stop logs stream.
@@ -668,6 +669,28 @@ class GalaxyBot {
 					message.channel.send(ManiaExchange.createMapEmbed(mapInfo[0]));
 					guild.log(`Successfully sent ${mapInfo[0].Name} info.`);
 				});
+			}
+		}
+
+		// Check if message contains any ManiaPlanet Forum post.
+		if (message.content.match(/forum\.maniaplanet\.com/)) {
+			var foundLinks = message.content.match(/https?:\/\/forum\.maniaplanet\.com\/viewtopic\.php\?[\w=&#]+/g);
+
+			if (foundLinks && guild.getSetting("embed-forum") === true) {
+				for (const link of foundLinks) {
+					guild.log(`Detected ManiaPlanet Forum post: "${link}".`);
+
+					MPForum.getPost(link).then(post => {
+						if (post === undefined) return;
+
+						message.channel.send(MPForum.createEmbed(post));
+						guild.log(`Successfully sent post "${post.title}".`);
+					})
+
+					.catch(error => {
+						guild.log("Problem while embedding a post: " + error);
+					});
+				}
 			}
 		}
 

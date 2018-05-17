@@ -31,6 +31,7 @@ settings:
   embed-mx:       true
   embed-titles:   true
   embed-maps:     true
+  embed-forum:    true
   max-duration:   1800
   unit-convert:   false
   stalk-edits:    false

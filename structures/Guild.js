@@ -10,9 +10,10 @@ const settingsDir = "./guilds/";
 // List of all available settings of a guild.
 const availableSettings = new Map([
 	["prefix",			"Character used to indicate commands."],
-	["embed-mx",		"Detect and send Mania Exchange links."],
-	["embed-titles",	"Detect and send ManiaPlanet titles links."],
-	["embed-maps",		"Detect and send ManiaPlanet maps links."],
+	["embed-mx",		"Detect and send Mania Exchange maps."],
+	["embed-titles",	"Detect and send ManiaPlanet titles."],
+	["embed-maps",		"Detect and send ManiaPlanet maps."],
+	["embed-forum",		"Detect and send ManiaPlanet Forum posts."],
 	["roles",			"Roles with permissions to manage the GalaxyBot settings and music player."],
 	["max-duration",	"Maximum duration (in seconds) of music tracks users without full permissions can play. 0 = no limit."],
 	["music-cmd-ch",	"The only channels, where music player commands are accepted."],

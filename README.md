@@ -76,9 +76,10 @@ Available GalaxyBot settings, which server administrators can tweak to customize
 |:-----------------:|:-------------:|:-------:| ----------- |
 | `prefix`          | `char`        | `!`     | Character used to indicate commands.
 | `roles`           | `snowflake[]` | `[]`    | Roles with permissions to manage the GalaxyBot settings and music player.
-| `embed-mx`        | `bool`        | `true`  | Detect and send Mania Exchange links.
-| `embed-titles`    | `bool`        | `true`  | Detect and send ManiaPlanet titles links.
-| `embed-maps`      | `bool`        | `true`  | Detect and send ManiaPlanet maps links.
+| `embed-mx`        | `bool`        | `true`  | Detect and send Mania Exchange maps.
+| `embed-titles`    | `bool`        | `true`  | Detect and send ManiaPlanet titles.
+| `embed-maps`      | `bool`        | `true`  | Detect and send ManiaPlanet maps.
+| `embed-forum`     | `bool`        | `true`  | Detect and send ManiaPlanet Forum posts.
 | `music-cmd-ch`    | `slowflake[]` | `[]`    | The only channels, where music player commands are accepted.
 | `max-duration`    | `int`         | `1800`  | Maximum duration (in seconds) of music tracks users without full permissions can play. `0` = no limit.
 | `limit-access`    | `bool`        | `false` | Disable music player commands for users without enough rights.
