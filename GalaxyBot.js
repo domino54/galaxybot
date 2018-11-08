@@ -3,7 +3,6 @@ const Discord = require("discord.js");
 const querystring = require("querystring");
 const yaml = require("js-yaml");
 const FB = require("fb");
-const pjson = require("./package.json");
 
 const https = require("https");
 const URL = require("url");
@@ -28,24 +27,14 @@ class GalaxyBot {
 	 * Creates a new GalaxyBot.
 	 */
 	constructor() {
-		this.client = new Discord.Client();
-		this.client.on("ready", () => { this.onReady(); });
-		this.client.on("error", error => { console.log(error); });
-		this.client.on("message", message => { this.onMessage(message); });
-		this.client.on("messageUpdate", (messageOld, messageNew) => { this.onEditedMessage(messageOld, messageNew); });
-		this.client.on("messageReactionAdd", (reaction, user) => { this.onNewReaction(reaction, user); });
-		this.client.on("channelDelete", channel => { this.onChannelDeleted(channel); });
-		this.client.on("guildMemberUpdate", (oldMember, newMember) => { this.onMemberUpdate(oldMember, newMember); });
-		this.client.on("guildDelete", guild => { this.onGuildDelete(guild); })
-
 		process.on("SIGINT", () => { this.end(); });
 		process.on("SIGTERM", () => { this.end(); });
 		process.on("SIGHUP", () => { this.end(); });
 		process.on("SIGBREAK", () => { this.end(); });
 
 		this.config = null;
-		this.version = pjson.version;
-		this.github = pjson.homepage;
+		this.version = null;
+		this.github = null;
 
 		this.activeGuilds = new Map();
 		this.activeUsers = new Map();
@@ -117,70 +106,184 @@ class GalaxyBot {
 	}
 
 	/**
+	 * Load the config.yml file.
+	 *
+	 * @returns {Promise.<Boolean>} true, if the config has been loaded.
+	 */
+	loadConfig() {
+		this.log(false, "Loading config file...");
+
+		const packagejson = require("./package.json");
+
+		// Package info.
+		if (packagejson) {
+			this.version = packagejson.version;
+			this.github = packagejson.homepage;
+		}
+
+		// Get the version date.
+		fs.stat("./package.json", (err, stats) => {
+			if (err) {
+				this.log(false, "Failed to obtain \"package.json\" stats: " + err);
+				return;
+			}
+
+			this.vdate = stats.mtime.toISOString().split("T")[0];
+		});
+
+		return new Promise((resolve, reject) => {
+			fs.readFile("./config.yml", "utf8", (err, data) => {
+				if (err) {
+					reject(err);
+					return;
+				}
+
+				const newConfig = yaml.load(data);
+
+				if (!newConfig) {
+					reject("Invalid \"config.yml\" file!");
+					return;
+				}
+
+				// Discord token not specified.
+				if (!newConfig.discord || !newConfig.discord.token) {
+					reject("Discord token is not specified!");
+					return;
+				}
+
+				// Initialize logs.
+				if (typeof(newConfig.logfile) === "string") {
+					this.logsStream = fs.createWriteStream(newConfig.logfile, { flags: "a" });
+					this.log(false, "Logs will be saved to: " + newConfig.logfile);
+				}
+
+				// Check if YouTube token is available.
+				this.isYouTubeAvailable = newConfig.youtube && newConfig.youtube.token;
+
+				if (this.isYouTubeAvailable) {
+					this.log(false, "YouTube token provided.");
+				}
+
+				// Connect to Facebook
+				if (newConfig.facebook && newConfig.facebook.appid && newConfig.facebook.secret) {
+					this.log(false, "Facebook login information provided.");
+
+					FB.api("oauth/access_token", {
+						client_id: newConfig.facebook.appid,
+						client_secret: newConfig.facebook.secret,
+						grant_type: "client_credentials"
+					}, response => {
+						if (!response || response.error) {
+							this.log(false, "A problem has occured while connecting to Facebook API.");
+							console.log(!response ? "Facebook: Authentication error." : response.error);
+							return;
+						}
+
+						FB.setAccessToken(response.access_token);
+						this.log(false, "Facebook connection authenticated.");
+					});
+				}
+
+				this.config = newConfig;
+				resolve(true);
+			});
+		});
+	}
+
+	/**
+	 * Loads commands from the ./commands/ directory.
+	 *
+	 * @returns {Promise.<Number>} The number of commands loaded.
+	 */
+	loadCommands() {
+		this.log(false, "Loading commands...");
+
+		return new Promise((resolve, reject) => {
+			fs.readdir("./commands/", (err, files) => {
+				if (err) {
+					reject(err);
+					return;
+				}
+
+				let newCommands = new Map();
+
+				files.forEach(file => {
+					const command = require("./commands/" + file);
+
+					if (command) {
+						newCommands.set(command.name, command);
+					}
+				});
+
+				// Don't go further if no commands were loaded.
+				if (newCommands.size <= 0) {
+					reject("No loadable commands in the  \"./commands/\" directory!");
+					return;
+				}
+
+				this.availableCommands = newCommands;
+				resolve(this.availableCommands.size);
+			});
+		});
+	}
+
+	/**
+	 * Creates a new client.
+	 */
+	createClient() {
+		if (!this.config.discord || typeof this.config.discord.token !== "string") {
+			this.log(false, "Discord token is not specified!");
+			return;
+		}
+
+		this.client = new Discord.Client();
+		this.client.on("ready", () => { this.onReady(); });
+		this.client.on("error", error => { console.log(error); });
+		this.client.on("message", message => { this.onMessage(message); });
+		this.client.on("messageUpdate", (messageOld, messageNew) => { this.onEditedMessage(messageOld, messageNew); });
+		this.client.on("messageReactionAdd", (reaction, user) => { this.onNewReaction(reaction, user); });
+		this.client.on("channelDelete", channel => { this.onChannelDeleted(channel); });
+		this.client.on("guildMemberUpdate", (oldMember, newMember) => { this.onMemberUpdate(oldMember, newMember); });
+		this.client.on("guildDelete", guild => { this.onGuildDelete(guild); });
+		this.client.login(this.config.discord.token);
+	}
+
+	/**
+	 * Login GalaxyBot to Discord.
+	 */
+	login() {
+		// Destroys previous client (if any).
+		if (this.client) {
+			this.client.destroy().then(() => {
+				this.createClient();
+			}).catch(error => {
+				console.log(error);
+			});
+		}
+
+		else {
+			this.createClient();
+		}
+	}
+
+	/**
 	 * Start the GalaxyBot.
 	 */
 	start() {
 		this.log(false, "Initializing GalaxyBot...");
 
-		// Load YAML config.
-		try {
-			this.config = yaml.safeLoad(fs.readFileSync("./config.yml", "utf8"));
-		}
-		catch (e) { console.log(e); }
-
-		// Config file not found.
-		if (!this.config) {
-			console.log("Configuration error: config.yml not found or empty!");
-			return;
-		}
-
-		// Check if YouTube token is available.
-		this.isYouTubeAvailable = this.config.youtube && this.config.youtube.token;
-
-		// Initialize logs.
-		if (typeof(this.config.logfile) === "string") {
-			this.logsStream = fs.createWriteStream(this.config.logfile, { flags: "a" });
-			this.log(false, "Logs will be saved to: " + this.config.logfile);
-		}
-
-		// Discord token not specified.
-		if (!this.config.discord || !this.config.discord.token) {
-			this.log(false, "Configuration error: Discord token is not specified in config.yml!");
-		}
-		
-		// Log in to Discord.
-		else this.client.login(this.config.discord.token);
-
-		// Connect to Facebook
-		if (this.config.facebook && this.config.facebook.appid && this.config.facebook.secret) {
-			FB.api("oauth/access_token", {
-				client_id: this.config.facebook.appid,
-				client_secret: this.config.facebook.secret,
-				grant_type: "client_credentials"
-			}, response => {
-				if (!response || response.error) {
-					this.log(false, "A problem has occured while connecting to Facebook API.");
-					console.log(!response ? "Facebook: Authentication error." : response.error);
-					return;
-				}
-				FB.setAccessToken(response.access_token);
-			});
-		}
-
-		// Load commands from external files.
-		fs.readdirSync("./commands/").forEach(file => {
-			const command = require("./commands/" + file);
-			this.availableCommands.set(command.name, command);
+		// Load config file.
+		this.loadConfig().then(response => {
+			this.login();
+		}).catch(error => {
+			this.log(false, "An error has occured while loading the config file: " + error);
 		});
 
-		// Get the version date.
-		fs.stat("./package.json", (error, stats) => {
-			if (error) {
-				console.log(error);
-				return;
-			}
-
-			this.vdate = stats.mtime.toISOString().split("T")[0];
+		// Load commands.
+		this.loadCommands().then(count => {
+			this.log(false, `${count} commands have been loaded.`);
+		}).catch(error => {
+			this.log(false, "An error has occured while loading the commands: " + error);
 		});
 	}
 
@@ -204,6 +307,13 @@ class GalaxyBot {
 		// Update ManiaPlanet servers statuses.
 		this.updateServersStatuses();
 		setInterval(() => { this.updateServersStatuses(); }, this.config.mpstatus.interval);
+
+		// Download Maniaplanet titles list.
+		ManiaPlanet.updateTitlesList().then(count => {
+			this.log(false, `ManiaPlanet titles list updated (${count} items).`);
+		}).catch(error => {
+			this.log(false, "Failed to update ManiaPlanet titles list: " + error);
+		});
 	}
 
 	/**
@@ -240,6 +350,9 @@ class GalaxyBot {
 			statusText = this.statusesList[index];
 			if (statusText != this.lastStatus || this.statusesList.length <= 1) break;
 		}
+
+		statusText = statusText.replace(/\$users/g, this.client.users.size);
+		statusText = statusText.replace(/\$guilds/g, this.client.guilds.size);
 
 		this.statusesList.splice(index, 1);
 		this.client.user.setActivity(statusText);
@@ -374,6 +487,13 @@ class GalaxyBot {
 		// Get the command model.
 		const commandModel = this.availableCommands.get(command.name);
 
+		// Command only available to the bot owner.
+		if (commandModel.owner === true && command.user.id != this.config.owner) {
+			//command.channel.send(`Sorry ${command.user}, only my owner is permitted to use this command!`);
+			//command.botGuild.log("Command is available for bot owner only.");
+			return;
+		}
+
 		// Command is available only on servers.
 		if (commandModel.serverOnly === true && command.botGuild.type != "guild") {
 			command.channel.send(`Sorry ${command.user}, this command is available only on servers!`);
@@ -381,8 +501,22 @@ class GalaxyBot {
 			return;
 		}
 
-		// Music player commands available only in whitelisted channels.
 		if (commandModel.musicPlayer === true) {
+			// Music player is disabled.
+			if (this.config.player.enabled !== true) {
+				command.channel.send(`Sorry ${command.user}, the music player is currently unavailable. :broken_heart:`);
+				command.botGuild.log("Music player is disabled globally.");
+				return;
+			}
+
+			// Music player enabled only for patrons.
+			if (this.config.player.patrons === true && !this.config.patrons.guilds.includes(command.guild.id)) {
+				command.channel.send(`Sorry ${command.user}, the music player is only available on servers, whose owners are patrons of **${this.config.patrons.name}** on **${this.config.patrons.site}**.\nAsk the server owner to unlock the music player by becoming a patron of ${this.config.patrons.name}:\n${this.config.patrons.url}`);
+				command.botGuild.log("Music player is not enabled on this server.");
+				return;
+			}
+
+			// Music player commands available only in whitelisted channels.
 			const musicTextChannels = command.botGuild.getSetting("music-cmd-ch");
 
 			// Command sent in a not whitelisted channel.
@@ -390,7 +524,7 @@ class GalaxyBot {
 				var channelsTags = [];
 
 				for (const channelId of musicTextChannels) {
-					channelsTags.push("<#" + channelId + ">");
+					channelsTags.push(`<#${channelId}>`);
 				}
 
 				command.channel.send(`You can't use music player commands in this channel, ${command.user}. Try in ${channelsTags.join(", ")}!`);
@@ -559,7 +693,7 @@ class GalaxyBot {
 		}
 
 		// GalaxyBot is annoying. Kinda.
-		else if (message.content.match(new RegExp("(((<@" + this.config.dommy + ">|Dommy).+bots?)|(GalaxyBot|<@" + this.client.id + ">)).+(is|are).+annoying", "i"))) {
+		else if (message.content.match(new RegExp("(((<@" + this.config.owner + ">|Dommy).+bots?)|(GalaxyBot|<@" + this.client.id + ">)).+(is|are).+annoying", "i"))) {
 			message.channel.send(`${message.author} You're annoying.`);
 			guild.log(`${message.author.tag} thinks I'm annoying.`);
 			user.lowerKarma();
@@ -735,7 +869,7 @@ class GalaxyBot {
 		// Stalk members, who edit their messages.
 		if (guild && guild.getSetting("stalk-edits") && messageOld.content != messageNew.content) {
 			messageOld.channel.send(`I see you, ${messageOld.author}: \`\`\`${messageOld.content.replace("`", "")}\`\`\``);
-			guild.log(`${message.author.tag} tried to be sneaky by editing their message.`);
+			guild.log(`${messageNew.author.tag} tried to be sneaky by editing their message.`);
 		}
 	}
 

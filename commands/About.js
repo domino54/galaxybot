@@ -33,12 +33,20 @@ module.exports = {
 				value: command.galaxybot.activeGuilds.size,
 				inline: true
 			}, {
+				name: "Node.js version",
+				value: process.version,
+				inline: true
+			}, {
+				name: "Allocated memory",
+				value: Math.floor(process.memoryUsage().rss / 1024 / 1024) + " MB",
+				inline: true
+			}, {
 				name: "Hella?",
 				value: "Hella.",
 				inline: true
 			}],
 			footer: {
-				text: "Created by Dommy#7014"
+				text: "Created by Dommy#0001"
 			}
 		}));
 		command.botGuild.log("Sent information about GalaxyBot.");

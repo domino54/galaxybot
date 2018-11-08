@@ -5,7 +5,7 @@ A Discord bot providing multiple integrations for Nadeo games in ManiaPlanet pla
 ## Commands
 All available commands of the GalaxyBot. Default command prefix is `!`.
 
-Reference: `command <mandatory> [optional]`.
+Reference: `command <mandatory attribute> [optional attribute]`.
 
 ### General
 
@@ -13,7 +13,6 @@ Reference: `command <mandatory> [optional]`.
 |:------------------:| ----------- |
 | `about`            | Shows some details about the GalaxyBot.
 | `help [command]`   | List the available GalaxyBot commands or sends the description of the given command.
-| `dommy`            | Mention [`Dommy#7014`](https://github.com/domino54/) with a thinking GIF. 🤔
 | `git`              | Sends a link to the GitHub repository with source code of the GalaxyBot.
 | `invite`           | Sends a link, which allows the user to add GalaxyBot to their server.
 | `guilds`           | The number of guilds GalaxyBot is active in. Full list featuring guilds names is available only to the bot owner, through a direct message.
@@ -21,7 +20,7 @@ Reference: `command <mandatory> [optional]`.
 | `user [name]`      | Display some information about your profile or the profile of a specific user.
 | `playing <game>`   | Current number of users seen by the GalaxyBot, which are playing the given `game`.
 | `oldest`           | Generate a Markdown file, containing a table listing all members of the server in order of the join time.
-| `8ball <question>` | Ask the GalaxyBot a yes or no question, it knows the answer to everything.
+| `8ball <question>` | Ask the GalaxyBot a yes or no question, she knows the answer to everything.
 | `time`             | Current time of the machine GalaxyBot is running on.
 | `emoji <emoji>`    | Shows detailed information about an emoji exising in the server.
 | `reorder [#]`      | The most pointless command, which shuffles the order of all words in the previously sent message, because reasons.
@@ -39,16 +38,16 @@ Reference: `command <mandatory> [optional]`.
 | Command                     | Description |
 |:---------------------------:| ----------- |
 | `channel <sm\|tm>`          | See what's currently being played on channels. Use `sm` for ShootMania channel and `tm` for TrackMania channel.
+| `server <login\|query>`     | Find a ManiaPlanet server by its login or name and show its current status.
 | `servers <id\|code> [page]` | Listing up to 10 most populated servers of a specific ManiaPlanet title. By adding `page`, you can navigate through the list.
 | `title <id\|code>`          | Shows information about the given title from the [ManiaPlanet website](http://maniaplanet.com/).
 | `map <uid>`                 | Shows information about the given map from ManiaPlanet website.
 | `mx <tm\|sm> <id\|query>`   | Search for a [Mania Exchange](http://mania-exchange.com/) map by its ID or the map name.
-| `mpserver <login\|query>`   | Find a ManiaPlanet server by its login or name and show its current status.
 | `addserver <login\|query>`  | Add a ManiaPlanet server status to the statuses channel. Up to 10 servers will be detected and updated.
 
 Bot automatically reacts to ManiaPlanet titles and maps links, as well as Mania Exchange maps links. This can be turned off via guild settings.
 
-Instead of using title `id` in commands you can use one of following short codes: canyon, storm, stadium, valley, lagoon, galaxy, pursuit, pursuit-s, royal, siege, battle, elite, combo, joust, warlords, heroes, tm2, competition, rpg, obstacle, stormuim, infection, speedball, alpine.
+Instead of using title `id` in commands, you can just search for a title by its name.
 
 ### Music player
 
@@ -68,6 +67,18 @@ Instead of using title `id` in commands you can use one of following short codes
 | `stop`                          | Allows GalaxyBot managers to stop music playback and clear the queue.
 | `pause`                         | Pauses the current track playback. The same command will resume the playback.
 | `limit-access`                  | Shortcut to toggle the `limit-access` setting, which restricts the music player access to the GalaxyBot managers only.
+
+### Owner commands
+These commands are available only for the bot owner in special situations.
+
+| Command        | Description |
+|:--------------:| ----------- |
+| `reloadconfig` | Reloads GalaxyBot configuration from the `config.yml` file.
+| `reloadcmds`   | Reloads commands from the `./commands/` direcotry.
+| `relog`        | Relog the GalaxyBot to (other) Discord account.
+| `logs`         | Shortcut to toggle the `limit-access` setting, which restricts the music player access to the GalaxyBot managers only.
+| `settalk`      | Set the channel used to talk as the bot.
+| `talk`         | Talk as the GalaxyBot in previously set channel.
 
 ## Settings
 Available GalaxyBot settings, which server administrators can tweak to customize the bot behavior.

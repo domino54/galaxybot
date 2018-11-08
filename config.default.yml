@@ -1,14 +1,27 @@
 logfile:      log.txt
-dommy:        99612832353505280
-maxqueue:     1000
+owner:        discord_user_id
 maxbrowsers:  10
 
+player:
+  enabled:      true
+  patrons:      false
+  maxqueue:     50
+  maxplaylist:  1
+
+patrons:
+  name:         "Your name"
+  site:         "Patron Service Name"
+  url:          patron_site_url
+  guilds:
+    - patron_guild_id
+  users:
+    - patron_user_id
+
 discord:
-  token:  your_token_here
+  token:  your_token
 
 youtube:
-  token:        your_token_here
-  maxplaylist:  1000
+  token:        your_token
 
 facebook:
   appid:  your_application_id
