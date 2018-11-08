@@ -1,36 +1,9 @@
 const Discord = require("discord.js");
 const https = require("https");
 const querystring = require("querystring");
-const hostname = "v4.live.maniaplanet.com";
+const hostname = "www.maniaplanet.com";
 
-// Common titles short codes.
-const commonTitles = {
-	"canyon": "TMCanyon@nadeo",
-	"storm": "SMStorm@nadeo",
-	"stadium": "TMStadium@nadeo",
-	"valley": "TMValley@nadeo",
-	"lagoon": "TMLagoon@nadeo",
-	"galaxy": "GalaxyTitles@domino54",
-	"pursuit": "Pursuit@domino54",
-	"pursuit-s": "PursuitStadium@domino54",
-	"royal": "SMStormRoyal@nadeolabs",
-	"siege": "SMStormSiege@nadeolabs",
-	"battle": "SMStormBattle@nadeolabs",
-	"elite": "SMStormElite@nadeolabs",
-	"combo": "SMStormCombo@nadeolabs",
-	"joust": "SMStormJoust@nadeolabs",
-	"warlords": "SMStormWarlords@nadeolabs",
-	"heroes": "SMStormHeroes@nadeolabs",
-	"tm2": "Trackmania_2@nadeolabs",
-	"competition": "esl_comp@lt_forever",
-	"rpg": "RPG@tmrpg",
-	"obstacle": "obstacle@smokegun",
-	"stormium": "GEs@guerro",
-	"infection": "infection@dmark",
-	"speedball": "SpeedBall@steeffeen",
-	"alpine": "TMOneAlpine@florenzius",
-	"speed": "TMOneSpeed@florenzius"
-};
+let existingTitles = [];
 
 // Write complete ManiaPlanet node SDK?
 
@@ -76,6 +49,30 @@ class ManiaPlanet {
 			response.on("data", data => { body += data; });
 			response.on("end", () => { callback(body); });
 			response.on("error", error => { console.log(error); });
+		});
+	}
+
+	static updateTitlesList() {
+		return new Promise((resolve, reject) => {
+			this.httpsGet("titles", { "orderBy": "playersLast24h", "length": 1000 }, body => {
+				var results = JSON.parse(body);
+
+				if (!Array.isArray(results)) {
+					reject("Titles list empty");
+					return;
+				}
+
+				existingTitles = results;
+
+				/*for (const title of results) {
+					existingTitles.push({
+						uid: title.uid,
+						name: title.name
+					});
+				}*/
+
+				resolve(results.length);
+			});
 		});
 	}
 
@@ -127,33 +124,58 @@ class ManiaPlanet {
 	 * @param {function} callback - Function to call when request is finished.
 	 */
 	static title(titleUid, callback) {
-		this.httpsGet("../ingame/public/titles/"+titleUid, null, body => {
+		this.httpsGet("../ingame/public/titles/" + encodeURIComponent(titleUid), null, body => {
 			var result = JSON.parse(body);
 			callback(result);
 		});
 	}
 
 	/**
-	 * Get the title uid from short code.
+	 * Search for a title by UID or the name..
 	 *
-	 * @param {string} titleCode - Short name of the title to find.
+	 * @param {string} searchString - Short name of the title to find.
 	 * @returns {string} UID of the title, if found.
 	 */
-	static getTitleUid(titleCode) {
-		var lowercase = titleCode.toLowerCase();
-		if (lowercase in commonTitles) return commonTitles[lowercase];
-		return titleCode;
-	}
+	static getTitleUid(searchString) {
+		let matchedTitles = [], searchWords = searchString.substring(0, 64).match(/\w+/g);
+		if (!searchWords) return searchString;
 
-	/**
-	 * Get the array of available titles codes.
-	 *
-	 * @returns {Array} Array of available titles codes.
-	 */
-	static getTitleCodes() {
-		var titleCodes = [];
-		for (const code in commonTitles) titleCodes.push(code);
-		return titleCodes;
+		function regexEscape(string) {
+			return string.replace(/[-\/\\^$*+?.()|[\]{}]/g, "\\$&");
+		};
+
+		// Scan titles.
+		for (const title of existingTitles) {
+			let totalMatches = 0;
+
+			// Scan for every separate word.
+			for (const word of searchWords) {
+				const regex = new RegExp(regexEscape(word), "gi");
+
+				for (const prop of [title.uid, title.name]) {
+					let match = prop.match(regex);
+					if (match) totalMatches += match.length;
+				}
+			}
+
+			if (totalMatches <= 0) continue;
+
+			// Push matched title.
+			matchedTitles.push({
+				uid: title.uid,
+				matches: totalMatches
+			});
+		}
+
+		if (matchedTitles.length <= 0) return searchString;
+
+		// Sort by most matches descending.
+		matchedTitles = matchedTitles.sort((a, b) => {
+			return b.matches - a.matches
+		});
+
+		// Return result with most matches.
+		return matchedTitles[0].uid;
 	}
 
 	/**
@@ -239,10 +261,14 @@ class ManiaPlanet {
 	static createTitleEmbed(titleInfo) {
 		if (typeof titleInfo !== "object") return undefined;
 
+		const description = this.stripFormatting(titleInfo.description);
+		let desc = description.substring(0, 256);
+		if (desc != description) desc += "...";
+
 		// Punchline and description.
 		var fields = [{
 			name: '"' + this.stripFormatting(titleInfo.punchline) + '"',
-			value: this.stripFormatting(titleInfo.description)
+			value: desc
 		}];
 
 		// Title cost in Planets.
@@ -265,6 +291,10 @@ class ManiaPlanet {
 			name: "Online players",
 			value: titleInfo.online_players,
 			inline: true
+		}, {
+			name: "Download",
+			value: `[Direct link](${titleInfo.download_url})`,
+			inline: true
 		});
 
 		// Title maker.
@@ -284,7 +314,7 @@ class ManiaPlanet {
 			url: titleInfo.title_page_url,
 			color: this.getTitleColor(titleInfo.primary_color),
 			fields: fields,
-			image: { url: titleInfo.card_url },
+			thumbnail: { url: titleInfo.card_url },
 			timestamp: new Date(titleInfo.last_update * 1000).toISOString()
 		});
 	}
