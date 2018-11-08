@@ -9,13 +9,13 @@ module.exports = {
 	execute: command => {
 		// Title UID not specified.
 		if (command.arguments.length <= 0) {
-			command.channel.send(`Sorry ${command.user}, but you need to specify the \`UID\` of a title you want to see servers of. Provide a valid \`UID\` in this command or use one of these short codes: ${ManiaPlanet.getTitleCodes().join(", ")}.`);
+			command.channel.send(`Sorry ${command.user}, but you need to specify \`UID\` of the title you'd like to read about. Provide a valid \`UID\` in this command or search for a title by its name.`);
 			command.botGuild.log("No title UID specified.");
 			return;
 		}
 
 		// Get the title UID.
-		const titleUid = ManiaPlanet.getTitleUid(command.arguments[0]);
+		const titleUid = ManiaPlanet.getTitleUid(command.galaxybot.escapeMentions(command.arguments.join(" "), command.message.mentions));
 
 		// Results page.
 		var pageNb = 1;

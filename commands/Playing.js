@@ -57,6 +57,11 @@ module.exports = {
 		// Get the target action.
 		let actionType = ["playing", "streaming", "listening to", "watching"][targetGame ? targetGame.type : 0];
 
+		if (gameName === "Fortnite") {
+			actionType = "having";
+			gameName = "big gay";
+		}
+
 		switch (nbPlayers) {
 			// We don't know anyone playing this.
 			case 0 :
@@ -73,6 +78,6 @@ module.exports = {
 				command.channel.send(`I know **${nbPlayers}** users ${actionType} **${gameName}** right now, ${command.user}.`);
 		}
 		
-		command.botGuild.log(`${nbPlayers} users playing requested game.`);
+		command.botGuild.log(`${nbPlayers} user(s) ${actionType} ${gameName}.`);
 	}
 }

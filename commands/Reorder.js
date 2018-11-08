@@ -9,6 +9,21 @@ module.exports = {
 			return num <= min ? min : num >= max ? max : num;
 		}
 
+		function shuffle(array) {
+			var currentIndex = array.length, temporaryValue, randomIndex;
+
+			while (currentIndex !== 0) {
+				randomIndex = Math.floor(Math.random() * currentIndex);
+				currentIndex -= 1;
+
+				temporaryValue = array[currentIndex];
+				array[currentIndex] = array[randomIndex];
+				array[randomIndex] = temporaryValue;
+			}
+
+			return array;
+		}
+
 		// Get the order of the message.
 		const parsedNumber = command.arguments[0] ? parseInt(command.arguments.shift()) : 1;
 		const messageOrder = clamp(parsedNumber, 1, 50);
@@ -29,14 +44,11 @@ module.exports = {
 				return;
 			}
 
-			let messageWords = command.galaxybot.escapeMentions(message.content, message.mentions).split(" ");
-			messageWords.sort(() => { return 0.5 - Math.random(); });
-			let targetMessage = messageWords.join(" ");
-			
+			let targetMessage = shuffle(command.galaxybot.escapeMentions(message.content, message.mentions).split(" ")).join(" ");
 
 			// Send the message.
 			command.channel.send(targetMessage);
-			command.botGuild.log(`Shuffled ${messageWords.length} words.`);
+			command.botGuild.log(`Shuffled a message.`);
 		})
 
 		.catch(error => {

@@ -75,8 +75,12 @@ class ServerBrowser {
 			switch (this.nbServers) {
 				// No servers were found.
 				case 0 : {
-					if (this.page <= 1) content = `Looks like there are no servers online in **${this.titleName}** right now, ${this.user}. :rolling_eyes:`;
-					else content = `**${this.titleName}** doesn't have this many servers, ${this.user}. :thinking:`;
+					if (this.page <= 1) {
+						content = `Looks like there are no servers online in **${this.titleName}** right now, ${this.user}. :rolling_eyes:`;
+					} else {
+						content = `**${this.titleName}** doesn't have so many servers, ${this.user}. :thinking:`;
+					}
+
 					break;
 				}
 
@@ -136,7 +140,7 @@ class ServerBrowser {
 
 				// Initialize the browser for further use.
 				.then(message => {
-					if (this.isActive || (this.nbServers <= pageLength && this.page > 1)) return;
+					if (this.isActive || this.nbServers <= 1 || (this.nbServers <= pageLength && this.page == 1)) return;
 
 					const botMember = this.guild.members.get(this.galaxybot.client.user.id);
 

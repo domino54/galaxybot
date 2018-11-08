@@ -6,7 +6,7 @@ module.exports = {
 
 	execute: command => {
 		var targetUser = command.user;
-		var userColor = command.guild ? command.member.displayColor : undefined;
+		var userColor = undefined;
 
 		// Find the matching member if in a guild and specified.
 		if (command.guild && command.arguments.length >= 1) {
@@ -23,6 +23,7 @@ module.exports = {
 			}
 
 			targetUser = targetMember.user;
+			userColor = targetMember.displayColor;
 		}
 
 		// User has no avatar.

@@ -30,7 +30,7 @@ module.exports = {
 			// Unknown channel.
 			default : {
 				command.channel.send(`Well, currently we have only two channels - \`sm\` and \`tm\`, ${command.user}. :shrug:`);
-				command.botGuild.log(`Unknown channel: ${channelType}.`);
+				command.botGuild.log(`Unknown channel.`);
 				return;
 			}
 		}

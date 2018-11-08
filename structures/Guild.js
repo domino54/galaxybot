@@ -491,7 +491,6 @@ class Guild {
 
 		// Create a new voice connection, if there is none.
 		if (this.voiceConnection === undefined) {
-			/*
 			member.voiceChannel.join().then(connection => {
 				this.voiceConnection = connection;
 				this.playNextTrack();
@@ -511,25 +510,6 @@ class Guild {
 				});
 			})
 			.catch(error => {
-				console.log(error);
-			});
-			*/
-
-			// Workaround for the instant skip problem.
-			member.voiceChannel.join();
-			this.voiceConnection = this.guild.voiceConnection;
-
-			this.voiceConnection.on("ready", () => {
-				this.playNextTrack();
-				this.log("Created new voice connection.");
-			});
-				
-			this.voiceConnection.on("disconnect", () => {
-				this.voiceConnection = undefined;
-				this.log("Disconnected from voice.");
-			});
-
-			this.voiceConnection.on("error", error => {
 				console.log(error);
 			});
 		}
