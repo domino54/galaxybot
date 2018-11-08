@@ -2,11 +2,9 @@ module.exports = {
 	name: "settalk",
 	description: "Set the channel used to talk as the bot. For GalaxyBot creator only.",
 	hidden: true,
+	owner: true,
 
 	execute: command => {
-		// Access denied.
-		if (command.user.id != command.galaxybot.config.dommy) return;
-
 		// No channel specified.
 		if (command.arguments.length <= 0) {
 			command.channel.send(`Sorry ${command.user}, but you have to give me ID of the channel.`);

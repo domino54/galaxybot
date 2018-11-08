@@ -12,7 +12,7 @@ module.exports = {
 		const message = `I'm active in **${serversNames.length}** server${serversNames.length != 1 ? "s" : ""}`;
 
 		// Complete guilds list in personal message for owner.
-		if (command.user.id == command.galaxybot.config.dommy && command.channel.type == "dm") {
+		if (command.user.id == command.galaxybot.config.owner && command.channel.type == "dm") {
 			command.channel.send(`${message}: ${serversNames.join(", ")}.`);
 		}
 

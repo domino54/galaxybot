@@ -83,7 +83,7 @@ module.exports = {
 		// Try to load track from a local file.
 		if (query.match(/^[A-Z]:(\/|\\)/)) {
 			// Unauthorized.
-			if (command.member.id != command.galaxybot.config.dommy) {
+			if (command.member.id != command.galaxybot.config.owner) {
 				command.channel.send(`Sorry ${command.user}, but only my creator is allowed to play music from the server storage. :no_entry:`);
 				command.botGuild.log("Not authorized to use server resources.");
 				return;

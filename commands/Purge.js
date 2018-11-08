@@ -5,7 +5,7 @@ module.exports = {
 
 	execute: command => {
 		// User doesn't have "Manage messages" permission.
-		if (!command.channel.permissionsFor(command.member).has("MANAGE_MESSAGES") && command.user.id != command.galaxybot.config.dommy) {
+		if (!command.channel.permissionsFor(command.member).has("MANAGE_MESSAGES") && command.user.id != command.galaxybot.config.owner) {
 			command.channel.send(`Sorry ${command.user}, you don't have the **Manage messages** permission in this channel! :no_entry:`);
 			command.botGuild.log("User has no Manage messages permission.");
 			return;

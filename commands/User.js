@@ -2,11 +2,11 @@ const Discord = require("discord.js");
 
 module.exports = {
 	name: "user",
-	description: "Display some information about your profile or the profile of a specific user.",
+	description: "Display some information about your profile or the profile of a specific user. GalaxyBot owner can search for users in all servers.",
 
 	execute: command => {
 		let targetUser = command.user, targetMember = command.member, argument;
-		const extendedSearch = command.user.id == command.galaxybot.config.dommy;
+		const extendedSearch = command.user.id == command.galaxybot.config.owner;
 
 		if (command.arguments.length >= 1) {
 			argument = command.galaxybot.escapeMentions(command.arguments.join(" "), command.message.mentions);
