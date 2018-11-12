@@ -89,8 +89,11 @@ module.exports = {
 				return;
 			}
 
+			command.channel.startTyping();
+
 			var track = new Track(query, command.member, track => {
 				command.botGuild.onTrackCreated(track, command.member, query);
+				command.channel.stopTyping();
 			});
 		}
 
@@ -135,14 +138,20 @@ module.exports = {
 			const isNow = command.arguments[1] === "now";
 			const isNext = isNow || command.arguments[1] === "next";
 
+			command.channel.startTyping();
+
 			var track = new Track(url, command.member, track => {
 				command.botGuild.onTrackCreated(track, command.member, url, { next: isNext, now: isNow });
+				command.channel.stopTyping();
 			});
 		}
 
 		// Search for the track in YouTube.
 		else {
+			command.channel.startTyping();
 			command.botGuild.searchYouTube(query, command.member).then(nbVideos => {
+				command.channel.stopTyping();
+
 				// A playlist has been added.
 				if (nbVideos > 0) {
 					command.channel.send(`Okay ${command.user}, I'm adding **${nbVideos}** videos from your playlist to the queue!`);
@@ -179,6 +188,7 @@ module.exports = {
 
 				command.channel.send(errorMessage);
 				command.botGuild.log("Error occured while searching in YouTube: " + error);
+				command.channel.stopTyping();
 			});
 		}
 	}

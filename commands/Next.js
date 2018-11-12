@@ -35,7 +35,7 @@ module.exports = {
 		
 		// Queue is not that long
 		if (!command.botGuild.tracksQueue[trackOrder]) {
-			command.channel.send(`The music player is only **${command.botGuild.tracksQueue.length}** request${command.botGuild.tracksQueue.length > 1 ? "s" : ""} long. :shrug:`);
+			command.channel.send(`The music player queue is only **${command.botGuild.tracksQueue.length}** request${command.botGuild.tracksQueue.length > 1 ? "s" : ""} long. :shrug:`);
 			command.botGuild.log("Given order exceeds the music player queue.");
 			return;
 		}

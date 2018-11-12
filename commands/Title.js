@@ -15,9 +15,12 @@ module.exports = {
 		// Get the title UID.
 		const titleUid = ManiaPlanet.getTitleUid(command.galaxybot.escapeMentions(command.arguments.join(" "), command.message.mentions));
 		command.botGuild.log(`Downloading "${titleUid}" title information.`);
+		command.channel.startTyping();
 
 		// Download the title information.
 		ManiaPlanet.title(titleUid, titleInfo => {
+			command.channel.stopTyping();
+
 			// Title not found.
 			if (!titleInfo || titleInfo.code == 404) {
 				command.channel.send(`Sorry ${command.user}, I can't recognize the **${titleUid}** title... :shrug:`);

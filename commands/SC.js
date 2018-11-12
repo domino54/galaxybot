@@ -42,9 +42,12 @@ module.exports = {
 		}
 
 		// Search for a track in SoundCloud.
+		command.channel.startTyping();
+
 		var url = "scsearch:" + query;
 		var track = new Track(url, command.member, track => {
 			command.botGuild.onTrackCreated(track, command.member, url);
+			command.channel.stopTyping();
 		});
 	}
 }

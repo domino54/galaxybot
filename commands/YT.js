@@ -31,7 +31,10 @@ module.exports = {
 
 		const query = command.arguments.join(" ");
 
+		command.channel.startTyping();
 		command.botGuild.searchYouTube(query, command.member).then(nbVideos => {
+			command.channel.stopTyping();
+
 			// A playlist has been added.
 			if (nbVideos > 0) {
 				command.channel.send(`Okay ${command.user}, I'm adding **${nbVideos}** videos from your playlist to the queue!`);
@@ -68,6 +71,7 @@ module.exports = {
 
 			command.channel.send(errorMessage);
 			command.botGuild.log("Error occured while searching in YouTube: " + error);
+			command.channel.stopTyping();
 		});
 	}
 }
