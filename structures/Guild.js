@@ -189,7 +189,7 @@ class Guild {
 	 */
 	isGalaxyBotManager(member) {
 		if (!member) return false;
-		if (this.isAdministrator(member) || member.id == this.galaxybot.config.dommy) return true;
+		if (this.isAdministrator(member) || member.id == this.galaxybot.config.owner) return true;
 		if (!this.settings || !this.settings.roles) return false;
 
 		for (const roleId of this.settings.roles) {
@@ -357,8 +357,8 @@ class Guild {
 		if (this.lastStop > 0 && Date.now() - this.lastStop < 1000) return; // Playlist spam prevention.
 
 		// Queue has reached the limit.
-		const maxQueueLength = !isNaN(this.galaxybot.config.maxqueue) ? this.galaxybot.config.maxqueue : 0;
-		if (maxQueueLength > 0 && this.tracksQueue.length >= maxQueueLength) return;
+		const maxQueueLength = !isNaN(this.galaxybot.config.player.maxqueue) ? this.galaxybot.config.player.maxqueue : 0;
+		if (maxQueueLength > 0 && this.tracksQueue.length >= maxQueueLength && member.id != this.galaxybot.config.owner) return;
 
 		var errorMessage, hasPermissions = this.isGalaxyBotManager(member);
 
@@ -563,8 +563,10 @@ class Guild {
 				return;
 			}
 
-			const maxResults = this.galaxybot.config.youtube.maxplaylist;
-			const options = { maxResults: (maxResults > 0 ? maxResults : 0) };
+			const maxResults = this.galaxybot.config.player.maxplaylist;
+			const options = new Object();
+
+			if (maxResults) options.maxResults = maxResults;
 
 			yt_playlist(this.galaxybot.config.youtube.token, playlistID, options).then(items => {
 				this.log(`Found ${items.length} videos in playlist ${playlistID}.`);
@@ -924,7 +926,7 @@ class Guild {
 						}
 
 						// Role is highest user role, or even higher.
-						if (!this.isAdministrator(member) && member.id != this.galaxybot.config.dommy) {
+						if (!this.isAdministrator(member) && member.id != this.galaxybot.config.owner) {
 							console.log(targetRole.calculatedPosition);
 							console.log(member.highestRole.calculatedPosition);
 							if (targetRole.calculatedPosition >= member.highestRole.calculatedPosition) {
