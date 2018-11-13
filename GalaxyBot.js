@@ -18,6 +18,7 @@ const PendingCommand = require("./structures/PendingCommand.js");
 const ManiaPlanet = require("./integrations/ManiaPlanet.js");
 const ManiaExchange = require("./integrations/ManiaExchange.js");
 const MPForum = require("./integrations/MPForum.js");
+const RedditFeed = require("./integrations/RedditFeed.js");
 
 /**
  * The GalaxyBot itself.
@@ -35,6 +36,7 @@ class GalaxyBot {
 		this.config = null;
 		this.version = null;
 		this.github = null;
+		this.reddit = null;
 
 		this.activeGuilds = new Map();
 		this.activeUsers = new Map();
@@ -183,6 +185,9 @@ class GalaxyBot {
 						this.log(false, "Facebook connection authenticated.");
 					});
 				}
+
+				// Create a new reddit feed.
+				this.reddit = new RedditFeed(newConfig.reddit);
 
 				this.config = newConfig;
 				resolve(true);
@@ -498,6 +503,13 @@ class GalaxyBot {
 		if (commandModel.serverOnly === true && command.botGuild.type != "guild") {
 			command.channel.send(`Sorry ${command.user}, this command is available only on servers!`);
 			command.botGuild.log("Command is available only in guilds.");
+			return;
+		}
+
+		// NSFW command in not NSFW channel.
+		if (commandModel.nsfw === true && (command.channel.type !== "dm" && !command.channel.nsfw)) {
+			command.channel.send(`Hold up ${command.user}, either use this command in a NSFW-flagged channel or send me a private message. :smirk:`);
+			command.botGuild.log("Command available only in NSFW channels.");
 			return;
 		}
 
