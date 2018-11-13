@@ -20,6 +20,10 @@ patrons:
 discord:
   token:  your_token
 
+reddit:
+  timeout:      3600000
+  cache-size:   100
+
 youtube:
   token:        your_token
 
