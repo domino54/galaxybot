@@ -6,7 +6,7 @@ module.exports = {
 	description: "Get some hot memes directly from the [r/dankmemes](https://www.reddit.com/r/dankmemes) subreddit.",
 
 	execute: command => {
-		const cachedPostsCount = 50;
+		const cachedPostsCount = 100;
 
 		/**
 		 * Creates a nice embed of the reddit post.
@@ -28,7 +28,8 @@ module.exports = {
 				footer: {
 					text: post.score + " point" + (post.score != 1 ? "s" : "") + " • " + post.num_comments + " comment" + (post.num_comments != 1 ? "s" : "")
 				},
-				timestamp: new Date(post.created_utc * 1000).toISOString()
+				timestamp: new Date(post.created_utc * 1000).toISOString(),
+				color: command.botGuild.color
 			}));
 
 			command.botGuild.log("Sent a reddit post: " + post.permalink);
@@ -46,7 +47,7 @@ module.exports = {
 				}
 			}
 
-			let index = command.galaxybot.memecache.indices.splice(Math.floor(Math.random() * command.galaxybot.memecache.indices.length))[0];
+			let index = command.galaxybot.memecache.indices.splice(Math.floor(Math.random() * command.galaxybot.memecache.indices.length), 1)[0];
 
 			return command.galaxybot.memecache.memes[index]["data"];
 		}
