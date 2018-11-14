@@ -486,7 +486,7 @@ class GalaxyBot {
 		if (!botUser || !channel) return false;
 
 		// Owner is immune to the rate limit.
-		if (user.id == this.config.owner) return false;
+		if (botUser.id == this.config.owner) return false;
 
 		let millisecondsLeft = botUser.countRateLimit(this.config.ratelimit.increment, this.config.ratelimit.peak);
 
