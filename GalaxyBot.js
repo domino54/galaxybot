@@ -476,6 +476,34 @@ class GalaxyBot {
 	}
 
 	/**
+	 * Check if the user should be rate limited.
+	 *
+	 * @param {botUser} botUser - The user to check rate limits.
+	 * @param {Object} channel - The channel to send the warning in.
+	 * @returns {Boolean} true, if the command should be rejected.
+	 */
+	rateLimitUser(botUser, channel) {
+		if (!botUser || !channel) return false;
+
+		// Owner is immune to the rate limit.
+		if (user.id == this.config.owner) return false;
+
+		let millisecondsLeft = botUser.countRateLimit(this.config.ratelimit.increment, this.config.ratelimit.peak);
+
+		// The user is being rate limited.
+		if (millisecondsLeft > 0) {
+			if (!botUser.wasRateWarned) {
+				channel.send(`Woooaaaahh... Ain't you speeding too much, ${botUser.user}? :oncoming_police_car: Chill a bit and use the commands again in **${millisecondsLeft / 1000} seconds**! :point_right:`);
+			}
+
+			botUser.log(`Being rate limited (${millisecondsLeft}).`);
+			return true;
+		}
+
+		return false;
+	}
+
+	/**
 	 * New, improved commands handling.
 	 *
 	 * @param {PendingCommand} command - The command that's been sent.
@@ -485,6 +513,9 @@ class GalaxyBot {
 
 		// The command doesn't exist.
 		if (!this.availableCommands.has(command.name)) return;
+
+		// Rate limiting.
+		if (this.rateLimitUser(command.botUser, command.channel)) return;
 
 		// Log command.
 		command.botGuild.log(`Command "${command.name}" sent by ${command.user.tag}.`);

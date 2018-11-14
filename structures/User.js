@@ -15,6 +15,10 @@ class User {
 		this.galaxybot = galaxybot;
 		this.type = "user";
 
+		this.rateLimitCount	= 0;
+		this.rateLimitTriggered = false;
+		this.rateLimitWarned = false;
+
 		this.serverBrowsers = [];
 
 		this.annoyanceTimestamp = 0; ///< Later computed into annoyance level
@@ -79,6 +83,55 @@ class User {
 
 		var diff = this.annoyanceTimestamp - now;
 		return Math.floor(diff / 60);
+	}
+
+	/**
+	 * Check if the user is being rate limited.
+	 *
+	 * @param {Number} increment - Seconds added to the rate limit per used command.
+	 * @param {Number} max - Maximum seconds of rate limit before user commands are locked.
+	 * @returns {Number} Number of seconds before user can send commands again.
+	 */
+	countRateLimit(increment, max) {
+		const now = Date.now();
+
+		// User is being rate limited once max limit duration is reached.
+		if (this.rateLimitCount >= now + max) {
+			this.rateLimitTriggered = true;
+			return this.rateLimitCount - now;
+		}
+
+		// Rate limit still applies.
+		else if (this.rateLimitTriggered && now < this.rateLimitCount) {
+			return this.rateLimitCount - now;
+		}
+
+		// Reset warning.
+		this.rateLimitWarned = false;
+		this.rateLimitTriggered = false;
+
+		// Restart rate limit counter.
+		if (now > this.rateLimitCount) {
+			this.rateLimitCount = now + increment;
+		}
+
+		// Increment rate limit counter.
+		else {
+			this.rateLimitCount += increment;
+		}
+
+		return 0;
+	}
+
+	/**
+	 * Get whether we warned the user for being rate limited or not.
+	 *
+	 * @returns {Boolean} true, if the user has been warned for current rate limit excession.
+	 */
+	get wasRateWarned() {
+		if (this.rateLimitWarned) return true;
+		this.rateLimitWarned = true;
+		return false;
 	}
 }
 

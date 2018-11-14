@@ -2,6 +2,10 @@ logfile:      log.txt
 owner:        discord_user_id
 maxbrowsers:  10
 
+ratelimit:
+  increment:    2000
+  peak:         3000
+
 player:
   enabled:      true
   patrons:      false
