@@ -1,7 +1,7 @@
 const Discord = require("discord.js");
 const https = require("https");
 const querystring = require("querystring");
-const hostname = "www.maniaplanet.com";
+const hostname = "prod.live.maniaplanet.com";
 
 let existingTitles = [];
 
@@ -73,21 +73,6 @@ class ManiaPlanet {
 
 				resolve(results.length);
 			});
-		});
-	}
-
-	/**
-	 * Get channel episodes list.
-	 *
-	 * @param {string} channelId - ID of the channel to get episodes.
-	 * @param {Number} startDate - Episodes list start timestamp.
-	 * @param {Number} endDate - Episodes list end timestamp.
-	 * @param {Function} callback - Function to call when request is finished.
-	 */
-	static episodes(channelId, startDate, endDate, callback) {
-		this.httpsGet("channels/" + channelId + "/episodes", { "start_date": startDate, "end_date": endDate }, body => {
-			var result = JSON.parse(body);
-			callback(result);
 		});
 	}
 
