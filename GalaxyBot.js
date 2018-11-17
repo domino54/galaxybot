@@ -946,7 +946,7 @@ class GalaxyBot {
 				if (guild.getSetting("filter-admins") !== true) {
 					reaction.message.guild.members.forEach((member, snowflake) => {
 						if (member.id != user.id) return;
-						if (guild.isGalaxyBotManager(message.member)) applyFilter = false;
+						if (guild.isGalaxyBotManager(member)) applyFilter = false;
 					});
 				}
 
