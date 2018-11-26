@@ -24,13 +24,13 @@ class User {
 		this.annoyanceTimestamp = 0; ///< Later computed into annoyance level
 		this.warnedForJoyEmoji = false;
 
-		// Spamming good bot and bad bot
-		this.empathyGoodBot = false;
-		this.empathyBadBot = false;
+		// Spamming good bot and bad bot.
+		this.empathyTowardsBot = 0;
 		this.empathyChangeStreak = 0;
 
 		// Interactive reactions.
-		this.askedToCryChannel = false; ///< Channel snowflake
+		this.badBotResponseCh = false;
+		this.helpResponseCh = false;
 	}
 
 	/**

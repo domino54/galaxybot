@@ -618,12 +618,13 @@ class GalaxyBot {
 	 *
 	 * @param {Guild} guild - The guild message was sent in.
 	 * @param {Message} message - The message sent.
+	 * @returns {Boolean} true, if a reply was made.
 	 */
 	premadeResponses(guild, message) {
-		if (!guild || !message || !message.guild || message.author.id == this.client.id) return;
+		if (!guild || !message || !message.guild || message.author.id == this.client.id) return false;
 
 		// Responses disabled.
-		if (guild.getSetting("text-responses") !== true) return;
+		if (guild.getSetting("text-responses") !== true) return false;
 
 		// Get message user object.
 		var user = this.getGalaxyBotUser(message.author);
@@ -634,17 +635,53 @@ class GalaxyBot {
 			message.reply("I really hope you don't have pineapple on your pizza.");
 		}
 
+		// When user doubts in helpfulness.
+		else if (user.helpResponseCh !== false && message.channel.id == user.helpResponseCh) {
+			user.helpResponseCh = false;
+
+			if (message.content.match(/no/i)) {
+				guild.log(`${message.author.tag} doesn't need help.`);
+				message.channel.send(`Fuck off then, ${message.author}.`);
+				return true;
+			}
+
+			else if (message.content.match(/thank|ty|thx/i)) {
+				guild.log(`${message.author.tag} needed help and we served well.`);
+				message.channel.send(`Glad I could help you, ${message.author}!`);
+				return true;
+			}
+		}
+
+		// I asked them if I should cry.
+		else if (user.badBotResponseCh !== false && message.channel.id == user.badBotResponseCh) {
+			user.badBotResponseCh = false;
+
+			if (message.content.match(/yes/i)) {
+				message.channel.send(`Okay ${message.author}. *Goes to a corner and pretends to cry.*`);
+				guild.log(`${message.author.tag} wants me to cry.`);
+				return true;
+			}
+
+			else if (message.content.match(/no/i)) {
+				message.channel.send(`Okay ${message.author}, that's actually kind of you.*`);
+				guild.log(`${message.author.tag} doesn't want me to cry.`);
+				return true;
+			}
+		}
+
 		// I'm a good bot!
 		else if (message.content.match(/good bot/i)) {
 			guild.log(message.author.tag + " likes me!");
 			var replyContent = "";
 
+			user.badBotResponseCh = false;
+
 			// They changed their mind.
-			if (user.empathyBadBot) {
+			if (user.empathyTowardsBot == -1) {
 				switch (user.empathyChangeStreak) {
 					case 0 : { replyContent = `Changed your mind, ${message.author}?`; break; }
 					case 1 : { replyContent = "I see you're having fun."; break; }
-					default : return;
+					default : return false;
 				}
 
 				user.empathyChangeStreak += 1;
@@ -660,33 +697,33 @@ class GalaxyBot {
 					case 4 : { replyContent = "You're so annoying..."; break; }
 					case 5 : { replyContent = "I WON'T marry you."; break; }
 					case 6 : { replyContent = "FUCK OFF."; break; }
-					default : return;
+					default : return false;
 				}
 
 				user.empathyChangeStreak = 0;
 			}
 
-			user.empathyBadBot = false;
-			user.empathyGoodBot = true;
-
 			message.channel.send(replyContent);
 
-			// Lower the user karma for repeating the message.
+			user.empathyTowardsBot = 1;
 			user.lowerKarma();
+
+			return true;
 		}
 		
 		// And I'm a bad bot.
 		else if (message.content.match(/bad bot/i)) {
 			guild.log(message.author.tag + " doesn't like me.");
-			//message.reply("https://i.giphy.com/media/L7LylDVYU10lO/giphy.webp");
 			var replyContent = "";
 
+			user.badBotResponseCh = false;
+
 			// They changed their mind.
-			if (user.empathyGoodBot) {
+			if (user.empathyTowardsBot == 1) {
 				switch (user.empathyChangeStreak) {
 					case 0 : { replyContent = `Changed your mind, ${message.author}?`; break; }
 					case 1 : { replyContent = "I see you're having fun."; break; }
-					default : return;
+					default : return false;
 				}
 
 				user.empathyChangeStreak += 1;
@@ -697,35 +734,24 @@ class GalaxyBot {
 				switch (user.annoyanceLevel) {
 					case 0 : {
 						replyContent = `Am I supposed to cry now, ${message.author}?`;
-						user.askedToCryChannel = message.channel.id;
+						user.badBotResponseCh = message.channel.id;
 						break;
 					}
 					case 1 : { replyContent = "Pffffft."; break; }
 					case 2 : { replyContent = "I don't care."; break; }
 					case 3 : { replyContent = ":shrug:"; break; }
-					default : return;
+					default : return false;
 				}
 
 				user.empathyChangeStreak = 0;
 			}
 
-			user.empathyGoodBot = false;
-			user.empathyBadBot = true;
-
 			message.channel.send(replyContent);
 
-			// Lower the user karma for repeating the message.
+			user.empathyTowardsBot = -1;
 			user.lowerKarma();
-		}
 
-		// I asked them if I should cry.
-		else if (user.askedToCryChannel !== false) {
-			if (message.content.match(/yes/i) && message.channel.id == user.askedToCryChannel) {
-				message.channel.send(`Okay ${message.author}. *Goes to a corner and pretends to cry.*`);
-				guild.log(`${message.author.tag} wants me to cry.`);
-			}
-
-			user.askedToCryChannel = false;
+			return true;
 		}
 
 		// The AI is an asshole?
@@ -733,18 +759,42 @@ class GalaxyBot {
 			guild.log(`${message.author.tag} thinks the AI is an asshole.`);
 			message.channel.send("The AI is an asshole?");
 			user.lowerKarma();
+			return true;
 		}
 
 		// GalaxyBot is annoying. Kinda.
-		else if (message.content.match(new RegExp("(((<@" + this.config.owner + ">|Dommy).+bots?)|(GalaxyBot|<@" + this.client.id + ">)).+(is|are).+annoying", "i"))) {
-			message.channel.send(`${message.author} You're annoying.`);
-			guild.log(`${message.author.tag} thinks I'm annoying.`);
-			user.lowerKarma();
+		else if (message.content.match(new RegExp("((("+this.config.owner+"|Dommy('?s)?).+bots?)|(GalaxyBot|"+this.client.id+")).+(is|are)", "i"))) {
+			const wordsToFind = ["dumb", "stupid", "annoying", "an idiot"];
+			let foundWords = [];
+
+			for (const word of wordsToFind) {
+				if (message.content.match(new RegExp(word, "gi"))) {
+					foundWords.push(word);
+				}
+			}
+
+			if (foundWords.length > 0) {
+				let joinedWords = "";
+
+				for (var i = 0; i < foundWords.length; i++) {
+					if (i > 0) {
+						if (i == foundWords.length - 1) joinedWords += " and ";
+						else joinedWords += ", ";
+					}
+					joinedWords += foundWords[i];
+				}
+
+				message.channel.send(`${message.author} You're ${joinedWords}.`);
+				guild.log(`${message.author.tag} thinks I'm annoying.`);
+				user.lowerKarma();
+				return true;
+			}
 		}
 
 		// No u.
 		else if (message.content.match(/(you|u)r? (mum|mom)? gay/i)) {
 			message.channel.send("no u");
+			return true;
 		}
 	}
 
@@ -781,11 +831,12 @@ class GalaxyBot {
 		}
 
 		// Premade text responses.
-		this.premadeResponses(guild, message);
+		let premadeReply = this.premadeResponses(guild, message);
 
 		// If bot is mentioned, send information about help command.
-		if (message.isMentioned(this.client.user.id)) {
+		if (!premadeReply && message.isMentioned(this.client.user.id)) {
 			message.channel.send(`${message.author}, need help with anything? Type **${prefix}help** to see my commands! :raised_hands:`);
+			botUser.helpResponseCh = message.channel.id;
 			guild.log(`GalaxyBot mentioned by ${message.author.tag}`);
 		}
 
