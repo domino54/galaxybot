@@ -188,7 +188,7 @@ class RedditFeed {
 			},
 			title: post.title,
 			description: post.selftext.substring(0, 2000),
-			url: "https://www.reddit.com/" + post.permalink,
+			url: "https://www.reddit.com" + post.permalink,
 			image: {
 				url: post.url
 			},

@@ -1,6 +1,6 @@
 {
   "name": "galaxybot",
-  "version": "0.13.0",
+  "version": "0.14.0",
   "description": "A Discord bot capable of playing some music and doing other stuff. Pretty cute, too.",
   "main": "index.js",
   "scripts": {
@@ -25,7 +25,7 @@
   "homepage": "https://github.com/domino54/galaxybot#readme",
   "dependencies": {
     "discord.js": "^11.3.2",
-    "faceapp": "^0.4.5",
+    "faceapp": "^0.4.6",
     "fb": "^2.0.0",
     "html-markdown": "^1.0.17",
     "js-yaml": "^3.12.0",
