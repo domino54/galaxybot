@@ -1,5 +1,8 @@
 module.exports = {
 	name: "settalk",
+	aliases: ["st"],
+	syntax: ["% <channel>"],
+	group: "own",
 	description: "Set the channel used to talk as the bot. For GalaxyBot creator only.",
 	hidden: true,
 	owner: true,

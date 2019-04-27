@@ -1,6 +1,7 @@
 // Dependencies.
 const Discord = require("discord.js");
 const querystring = require("querystring");
+const stringSimilarity = require("string-similarity");
 const yaml = require("js-yaml");
 const FB = require("fb");
 
@@ -26,6 +27,8 @@ const RedditFeed = require("./integrations/RedditFeed.js");
 class GalaxyBot {
 	/**
 	 * Creates a new GalaxyBot.
+	 *
+	 * @constructor
 	 */
 	constructor() {
 		process.on("SIGINT", () => { this.end(); });
@@ -41,6 +44,7 @@ class GalaxyBot {
 		this.activeGuilds = new Map();
 		this.activeUsers = new Map();
 		this.availableCommands = new Map();
+		this.commandAliases = new Map();
 
 		this.isYouTubeAvailable = false;
 		this.logsStream = null;
@@ -52,10 +56,21 @@ class GalaxyBot {
 	}
 
 	/**
+	 * Require a module, getting rid of its previous cache.
+	 *
+	 * @param {String} module - Module resolvable.
+	 * @returns {any} Module.
+	 */
+	requireUncached(module) {
+		delete require.cache[require.resolve(module)];
+		return require(module);
+	}
+
+	/**
 	 * Log a GalaxyBot action.
 	 *
 	 * @param {*} object - Guild or User the log is related to.
-	 * @param {string} text - The message to be logged.
+	 * @param {String} text - The message to be logged.
 	 */
 	log(object, text) {
 		var group = "GLOBAL";
@@ -76,7 +91,7 @@ class GalaxyBot {
 	 * Remove mentions from the string.
 	 *
 	 * @param {String} text - The text to escape.
-	 * @param {MessageMentions} mentions - Discord mentions object.
+	 * @param {Discord.MessageMentions} mentions - Discord mentions object.
 	 * @returns {String} The escaped string.
 	 */
 	escapeMentions(text, mentions) {
@@ -96,7 +111,7 @@ class GalaxyBot {
 			});
 
 			if (mentions.users) mentions.users.forEach((user, id) => {
-				output = output.replace(new RegExp(`${user}`, "g"), user.username);
+				output = output.replace(new RegExp(`${Discord.user}`, "g"), user.username);
 			});
 
 			if (mentions.channels) mentions.channels.forEach((channel, id) => {
@@ -115,7 +130,7 @@ class GalaxyBot {
 	loadConfig() {
 		this.log(false, "Loading config file...");
 
-		const packagejson = require("./package.json");
+		const packagejson = this.requireUncached("./package.json");
 
 		// Package info.
 		if (packagejson) {
@@ -198,7 +213,7 @@ class GalaxyBot {
 	/**
 	 * Loads commands from the ./commands/ directory.
 	 *
-	 * @returns {Promise.<Number>} The number of commands loaded.
+	 * @returns {Promise.<Object>} Object representing the number of loaded commands and aliases.
 	 */
 	loadCommands() {
 		this.log(false, "Loading commands...");
@@ -211,12 +226,22 @@ class GalaxyBot {
 				}
 
 				let newCommands = new Map();
+				let newAliases = new Map();
 
 				files.forEach(file => {
-					const command = require("./commands/" + file);
+					const command = this.requireUncached("./commands/" + file);
 
+					// Add the command.
 					if (command) {
 						newCommands.set(command.name, command);
+						newAliases.set(command.name, command.name);
+
+						// Add command aliases.
+						if (command.aliases && command.aliases.length > 0) {
+							for (var i = 0; i < command.aliases.length; i++) {
+								newAliases.set(command.aliases[i], command.name);
+							}
+						}
 					}
 				});
 
@@ -227,7 +252,12 @@ class GalaxyBot {
 				}
 
 				this.availableCommands = newCommands;
-				resolve(this.availableCommands.size);
+				this.commandAliases = newAliases;
+
+				resolve({
+					commands: this.availableCommands.size,
+					aliases: this.commandAliases.size
+				});
 			});
 		});
 	}
@@ -285,8 +315,8 @@ class GalaxyBot {
 		});
 
 		// Load commands.
-		this.loadCommands().then(count => {
-			this.log(false, `${count} commands have been loaded.`);
+		this.loadCommands().then(counts => {
+			this.log(false, `${counts.commands} commands with ${counts.aliases} aliases have been loaded.`);
 		}).catch(error => {
 			this.log(false, "An error has occured while loading the commands: " + error);
 		});
@@ -383,8 +413,8 @@ class GalaxyBot {
 	/**
 	 * Get the bot user object of given user.
 	 *
-	 * @param {User} user - The user too get the object.
-	 * @returns {User} The bot user object.
+	 * @param {Discord.User} user - The user too get the object.
+	 * @returns {botUser} The bot user object.
 	 */
 	getGalaxyBotUser(user) {
 		if (!user) return false;
@@ -399,8 +429,8 @@ class GalaxyBot {
 	/**
 	 * Escape characters in regular expression.
 	 *
-	 * @param {string} string - The string to escape.
-	 * @returns {string} The escaped string.
+	 * @param {String} string - The string to escape.
+	 * @returns {String} The escaped string.
 	 */
 	regexEscape(string) {
 		return string.replace(/[-\/\\^$*+?.()|[\]{}]/g, "\\$&");
@@ -409,9 +439,9 @@ class GalaxyBot {
 	/**
 	 * Find an user by their username, ID or a mention.
 	 *
-	 * @param {string} string - The string to find the user by.
-	 * @param {MessageMentions} mentions - The mentions of the message.
-	 * @returns {User} The matching user.
+	 * @param {String} string - The string to find the user by.
+	 * @param {Discord.MessageMentions} mentions - The mentions of the message.
+	 * @returns {Discord.User} The matching user.
 	 */
 	findUser(string, mentions) {
 		if (string.length <= 0) return undefined;
@@ -449,7 +479,7 @@ class GalaxyBot {
 	 * Format a date into a readable format.
 	 *
 	 * @param {Date} date - The date to format.
-	 * @returns {string} The formatted date.
+	 * @returns {String} The formatted date.
 	 */
 	formatDate(date) {
 		if (!date instanceof Date) return "Invalid date";
@@ -457,9 +487,9 @@ class GalaxyBot {
 		/**
 		 * Append precending zeroes to an integer.
 		 *
-		 * @param {number} num - The integer to format.
-		 * @param {number} length - The target length of the string.
-		 * @returns {string} The formatted integer.
+		 * @param {Number} num - The integer to format.
+		 * @param {Number} length - The target length of the string.
+		 * @returns {String} The formatted integer.
 		 */
 		function formatInt(num, length) {
 			let string = Math.floor(num).toString();
@@ -473,6 +503,53 @@ class GalaxyBot {
 		return date.getUTCDate() + " " + months[date.getUTCMonth()] + " " + date.getUTCFullYear() + ", " +
 			formatInt(date.getUTCHours(), 2) + ":" + formatInt(date.getUTCMinutes(), 2) + "\n" +
 			"(" + (daysSince > 0 ? (daysSince > 1 ? `${daysSince} days ago` : "Yesterday") : "Today") + ")";
+	}
+
+	/**
+	 * Create an embed with a message contents.
+	 *
+	 * @param {Discord.Message} message - The message to create an embed from.
+	 * @returns {Discord.RichEmbed} Created message embed.
+	 */
+	createMessageEmbed(message) {
+		if (!message instanceof Discord.Message) return;
+
+		let imageURL = "";
+		let files = [];
+
+		// Fetch for al lattachments.
+		message.attachments.forEach((attachment, attachmentID) => {
+			if (imageURL == "" && !isNaN(attachment.width)) {
+				imageURL = attachment.url;
+			} else {
+				files.push(`[${attachment.filename}](${attachment.url})`);
+			}
+		});
+
+		// Fetch for the first image.
+		message.embeds.forEach((embed, embedID) => {
+			if (imageURL != "" || !embed.image) return;
+			imageURL = embed.image.url;
+		});
+
+		return new Discord.RichEmbed({
+			author: {
+				name: message.author.tag,
+				icon_url: message.author.avatarURL
+			},
+			description: message.content,
+			timestamp: message.createdTimestamp,
+			image: (imageURL ? { url: imageURL } : undefined),
+			color: (message.member ? message.member.displayColor : undefined),
+			fields: (files.length > 0 ? [{
+				name: "Attachments",
+				value: files.join("\n")
+			}] : []),
+			footer: (message.guild ? {
+				text: "#" + message.channel.name,
+				icon_url: message.guild.iconURL
+			} : undefined)
+		});
 	}
 
 	/**
@@ -503,6 +580,44 @@ class GalaxyBot {
 		return false;
 	}
 
+	getCommandModel(alias) {
+		// Alias not found.
+		if (!this.commandAliases.has(alias)) {
+			return undefined;
+		}
+
+		const commandName = this.commandAliases.get(alias);
+
+		// Command not found
+		if (!this.availableCommands.has(commandName)) {
+			return undefined;
+		}
+
+		return this.availableCommands.get(commandName);
+	}
+
+	getSimilarCommand(name) {
+		let commands = [];
+
+		this.availableCommands.forEach((commandModel, commandName) => {
+			if (commandModel.hidden === true) return;
+
+			commands.push(commandName);
+			
+			if (commandModel.aliases && commandModel.aliases.length > 0) {
+				commands = commands.concat(commandModel.aliases);
+			}
+		});
+
+		const matches = stringSimilarity.findBestMatch(name, commands);
+
+		if (matches && matches.bestMatch) {
+			return matches.bestMatch.target;
+		}
+
+		return "";
+	}
+
 	/**
 	 * New, improved commands handling.
 	 *
@@ -511,17 +626,25 @@ class GalaxyBot {
 	onCommand(command) {
 		if (!command instanceof PendingCommand) return;
 
+		// Get the command model.
+		const commandModel = this.getCommandModel(command.name);
+
 		// The command doesn't exist.
-		if (!this.availableCommands.has(command.name)) return;
+		if (!commandModel) {
+			//const suggestedCommand = this.getSimilarCommand(command.name);
+
+			//if (suggestedCommand) {
+			//	command.channel.send(`Did you mean to use **${suggestedCommand}**, ${command.user}? :thinking:`);
+			//}
+
+			return;
+		}
 
 		// Rate limiting.
 		if (this.rateLimitUser(command.botUser, command.channel)) return;
 
 		// Log command.
 		command.botGuild.log(`Command "${command.name}" sent by ${command.user.tag}.`);
-
-		// Get the command model.
-		const commandModel = this.availableCommands.get(command.name);
 
 		// Command only available to the bot owner.
 		if (commandModel.owner === true && command.user.id != this.config.owner) {
@@ -630,7 +753,7 @@ class GalaxyBot {
 		var user = this.getGalaxyBotUser(message.author);
 
 		// Pineapple does NOT go on pizza.
-		if (message.content.match(/pizza/i) && message.content.match(/pineapple/i)) {
+		if (message.content.match(/pizza|🍕/i) && message.content.match(/pineapple|🍍/i)) {
 			guild.log(`${message.author.tag} MIGHT be an idiot, who puts pineapple on their pizza.`);
 			message.reply("I really hope you don't have pineapple on your pizza.");
 		}
@@ -922,6 +1045,41 @@ class GalaxyBot {
 			}
 		}
 
+		// Messages quoting.
+		if (guild.getSetting("quoting") === true) {
+			const foundMessageURLs = message.content.match(/https?:\/\/((canary|ptb)\.)?discordapp\.com\/channels\/([0-9]+|@me)\/[0-9]+\/[0-9]+/g);
+			const foundSnowflakes = message.content.match(/[0-9]+/g);
+
+			// Quote a message from a link.
+			for (let i = 0; foundMessageURLs && i < foundMessageURLs.length && i < 3; i++) {
+				let messageExplodedURL = foundMessageURLs[i].split("/");
+				const messageID = messageExplodedURL.pop();
+				const channelID = messageExplodedURL.pop();
+				const channel = this.client.channels.get(channelID);
+
+				if (channel) {
+					channel.fetchMessage(messageID).then(quotedMessage => {
+						message.channel.send(this.createMessageEmbed(quotedMessage));
+					}).catch(error => {
+						//console.log(error);
+					});
+				}
+			}
+
+			// Quote a message in the channel from its ID.
+			for (let i = 0; foundSnowflakes && i < foundSnowflakes.length && i < 3; i++) {
+				const messageID = foundSnowflakes[i];
+
+				if (messageID.toString().length < 17) continue;
+				
+				message.channel.fetchMessage(messageID).then(quotedMessage => {
+					message.channel.send(this.createMessageEmbed(quotedMessage));
+				}).catch(error => {
+					//console.log(error);
+				});
+			}
+		}
+
 		// React with Joy.
 		if (message.content.match(/😂|😹/i) && guild.getSetting("mocking-joy") === true) {
 			guild.log(`${message.author.tag} is using cancerous emoji.`);
@@ -962,7 +1120,7 @@ class GalaxyBot {
 
 		// Stalk members, who edit their messages.
 		if (guild && guild.getSetting("stalk-edits") && messageOld.content != messageNew.content) {
-			messageOld.channel.send(`I see you, ${messageOld.author}: \`\`\`${messageOld.content.replace("`", "")}\`\`\``);
+			messageOld.channel.send(`I see you, ${messageOld.author}:`, this.createMessageEmbed(messageOld));
 			guild.log(`${messageNew.author.tag} tried to be sneaky by editing their message.`);
 		}
 	}
@@ -971,12 +1129,13 @@ class GalaxyBot {
 	 * Fired when someone reacts to a message.
 	 *
 	 * @param {messageReaction} reaction - The reaction user has contributed to.
-	 * @param {User} user - The user, who added their reaction.
+	 * @param {Discord.User} user - The user, who added their reaction.
 	 */
 	onNewReaction(reaction, user) {
-		if (!reaction || !user || user.id == this.client.user.id) return;
+		if (!reaction || !user || user.id == this.client.user.id || !reaction.message.guild) return;
 
 		const guild = this.getGalaxyBotGuild(reaction.message.guild);
+		const member = reaction.message.guild.members.get(user.id);
 
 		// Navigate through server browsers.
 		for (const browser of guild.serverBrowsers) {
@@ -989,28 +1148,77 @@ class GalaxyBot {
 			const filteredWords = guild.getSetting("filtered-words");
 			const matchingWords = guild.findFilteredWords(reaction.emoji.name, filteredWords);
 
-			// Find filtered words, if there are any.
-			if (matchingWords.length > 0) {
-				var applyFilter = true;
+			// Delete the reaction.
+			if (matchingWords.length > 0 && guild.getSetting("filter-admins") === true || !guild.isGalaxyBotManager(member)) {
+				reaction.remove(user).then(() => {
+					guild.log(`Deleted ${message.author.tag} reaction containing filtered phrases: ${matchingWords.join(", ")}.`);
+				})
+				.catch(error => {
+					guild.log("Couldn't filter out a reaction: missing permissions.");
+					// console.log(error);
+				});
+			}
+		}
 
-				// Ignore admins.
-				if (guild.getSetting("filter-admins") !== true) {
-					reaction.message.guild.members.forEach((member, snowflake) => {
-						if (member.id != user.id) return;
-						if (guild.isGalaxyBotManager(member)) applyFilter = false;
-					});
+		// Embed player functions.
+		if (guild.embedPlayer !== false && reaction.message.id == guild.embedPlayer.messageID && guild.currentTrack) {
+			reaction.remove(user).catch(error => {
+				guild.log(error);
+			});
+
+			let hasPermissions = guild.isGalaxyBotManager(member);
+
+			// Users can skip their own tracks.
+			if (reaction.emoji.name == "⏭") {
+				hasPermissions = hasPermissions || reaction.message.member.id == guild.currentTrack.senderId;
+			}
+
+			if (hasPermissions) switch (reaction.emoji.name) {
+				// Play/pause.
+				case "⏯" : {
+					if (guild.voiceDispatcher) {
+						if (guild.voiceDispatcher.paused) {
+							guild.voiceDispatcher.resume();
+						} else {
+							guild.voiceDispatcher.pause();
+						}
+					}
+
+					guild.updateEmbedPlayer();
+					break;
 				}
 
-				// Delete the reaction.
-				if (applyFilter) {
-					reaction.remove(user)
-						.then(() => {
-							guild.log(`Deleted ${message.author.tag} reaction containing filtered phrases: ${matchingWords.join(", ")}.`);
-						})
-						.catch(error => {
-							guild.log("Couldn't filter out a reaction: missing permissions.");
-							// console.log(error);
-						});
+				// Skip the current track.
+				case "⏭" : {
+					if (guild.voiceDispatcher) {
+						guild.voiceDispatcher.end();
+					}
+
+					break;
+				}
+
+				// Stop the playback.
+				case "⏹" : {
+					guild.destroyPlayer();
+					break;
+				}
+
+				// Queue previous page.
+				case "⬆" : {
+					if (guild.embedPlayer.prevQueuePage()) {
+						guild.updateEmbedPlayer();
+					}
+
+					break;
+				}
+
+				// Queue next track.
+				case "⬇" : {
+					if (guild.embedPlayer.nextQueuePage()) {
+						guild.updateEmbedPlayer();
+					}
+
+					break;
 				}
 			}
 		}

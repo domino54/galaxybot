@@ -61,3 +61,4 @@ settings:
   filter-admins:  false
   text-responses: true
   mocking-joy:    true
+  quoting:        true

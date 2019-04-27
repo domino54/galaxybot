@@ -1,6 +1,7 @@
 const Discord = require("discord.js");
 const https = require("https");
 const querystring = require("querystring");
+const BBCodeToMarkdown = require("bbcode-to-markdown");
 
 const hostname = "api.mania-exchange.com";
 const siteTM = "tm.mania-exchange.com";
@@ -131,7 +132,7 @@ class ManiaExchange {
 			title: mapInfo.Name,
 			url: "https://" + site + ".mania-exchange.com/tracks/" + mxid,
 			color: 0x7AD5FF,
-			description: mapInfo.Comments.substring(0, 2048),
+			description: BBCodeToMarkdown(mapInfo.Comments).substring(0, 2048),
 			author: {
 				name: mapInfo.Username,
 				url: "https://" + site + ".mania-exchange.com/user/profile/" + mapInfo.UserID
