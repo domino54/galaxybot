@@ -1,5 +1,6 @@
 module.exports = {
 	name: "pause",
+	group: "music",
 	description: "Pauses the current track playback. The same command will resume the playback.",
 	serverOnly: true,
 	musicPlayer: true,

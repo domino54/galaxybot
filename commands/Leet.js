@@ -6,6 +6,9 @@ const leetCharacters = new Map([
 
 module.exports = {
 	name: "leet",
+	aliases: ["1337"],
+	syntax: ["% <message>"],
+	group: "fun",
 	description: "Turns a sentence into 1337 speech.",
 
 	execute: command => {

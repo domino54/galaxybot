@@ -2,6 +2,9 @@ const Discord = require("discord.js");
 
 module.exports = {
 	name: "emoji",
+	aliases: ["e"],
+	syntax: ["% <emoji>"],
+	group: "info",
 	description: "Shows detailed information about an emoji exising in the server.",
 	serverOnly: true,
 

@@ -1,5 +1,6 @@
 module.exports = {
 	name: "oldest",
+	group: "info",
 	description: "Generate a Markdown file, containing a table listing all members of the server in order of the join time.",
 	serverOnly: true,
 

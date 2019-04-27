@@ -2,6 +2,9 @@ const Track = require("./../structures/Track.js");
 
 module.exports = {
 	name: "playattachment",
+	aliases: ["pa"],
+	syntax: ["% [order] [channel]"],
+	group: "music",
 	description: "Puts the latest audio file attachment sent in the channel in the queue. `#` can be used to determine which attachment should be played. Adding the `channel` parameter will search for an attachment in this particular channel.",
 	serverOnly: true,
 	musicPlayer: true,

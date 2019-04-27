@@ -2,6 +2,8 @@ const ManiaPlanet = require("./../integrations/ManiaPlanet.js");
 
 module.exports = {
 	name: "map",
+	syntax: ["% <uid>"],
+	group: "mp",
 	description: "Shows information about the given map from the ManiaPlanet website.",
 
 	execute: command => {

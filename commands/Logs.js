@@ -2,6 +2,7 @@ const fs = require("fs");
 
 module.exports = {
 	name: "logs",
+	group: "own",
 	description: "Sends the whole log file through a private message. Owner access only.",
 	hidden: true,
 	owner: true,

@@ -2,7 +2,10 @@ const Track = require("./../structures/Track.js");
 const youtubedl = require("youtube-dl");
 
 module.exports = {
-	name: "sc",
+	name: "soundcloud",
+	aliases: ["sc"],
+	syntax: ["% <search>"],
+	group: "music",
 	description: "Search for a SoundCloud track and add it to the music player queue.",
 	serverOnly: true,
 	musicPlayer: true,

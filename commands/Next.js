@@ -1,5 +1,7 @@
 module.exports = {
 	name: "next",
+	syntax: ["% [order]", "% me"],
+	group: "music",
 	description: "Shows details of the next request in the queue. `me` shows your first upcoming request. `order` can tell which request is at specific position in the queue.",
 	serverOnly: true,
 	musicPlayer: true,

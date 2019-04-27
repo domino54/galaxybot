@@ -2,6 +2,9 @@ const Discord = require("discord.js");
 
 module.exports = {
 	name: "8ball",
+	aliases: ["8b"],
+	syntax: ["% <question>"],
+	group: "fun",
 	description: "Ask the GalaxyBot a yes or no question, she knows the answer to everything.",
 
 	execute: command => {

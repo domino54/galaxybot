@@ -1,5 +1,7 @@
 module.exports = {
 	name: "time",
+	aliases: ["t"],
+	group: "info",
 	description: "Current time of the machine GalaxyBot is running on.",
 
 	execute: command => {

@@ -2,6 +2,8 @@ const Discord = require("discord.js");
 
 module.exports = {
 	name: "avatar",
+	syntax: ["% [user]"],
+	group: "info",
 	description: "Shows your avatar in the full size, or the avatar of requested server member.",
 
 	execute: command => {

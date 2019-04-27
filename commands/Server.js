@@ -2,6 +2,8 @@ const ManiaPlanet = require("./../integrations/ManiaPlanet.js");
 
 module.exports = {
 	name: "server",
+	syntax: ["% <login|search>"],
+	group: "mp",
 	description: "Find a ManiaPlanet server by its login or name and show its current status.",
 
 	execute: command => {

@@ -1,5 +1,8 @@
 module.exports = {
-	name: "yt",
+	name: "youtube",
+	aliases: ["yt"],
+	syntax: ["% <search>"],
+	group: "music",
 	description: "Search for a YouTube video or playlist and add it to the music player queue.",
 	serverOnly: true,
 	musicPlayer: true,

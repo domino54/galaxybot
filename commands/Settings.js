@@ -2,6 +2,8 @@ const Discord = require("discord.js");
 
 module.exports = {
 	name: "settings",
+	syntax: ["% <name> [new value]"],
+	group: "util",
 	description: "Manage the GalaxyBot settings in the server. Anyone can view the bot settings, however only the GalaxyBot managers can edit them. See the documentation for the full settings list.",
 	serverOnly: true,
 

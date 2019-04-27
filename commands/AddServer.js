@@ -1,5 +1,7 @@
 module.exports = {
 	name: "addserver",
+	syntax: ["% <login|search>"],
+	group: "mp",
 	description: "Add a ManiaPlanet server status to the statuses channel. Up to 10 servers will be detected and updated.",
 	serverOnly: true,
 

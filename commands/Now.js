@@ -3,6 +3,9 @@ const Discord = require("discord.js");
 
 module.exports = {
 	name: "now",
+	aliases: ["np"],
+	syntax: ["% [info]"],
+	group: "music",
 	description: "Shows what is currently being played. Append `info` to see more detailed information.",
 	serverOnly: true,
 	musicPlayer: true,

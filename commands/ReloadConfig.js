@@ -1,5 +1,7 @@
 module.exports = {
 	name: "reloadconfig",
+	aliases: ["cfg"],
+	group: "own",
 	description: "Reloads GalaxyBot configuration from the `config.yml` file. Owner access only.",
 	hidden: true,
 	owner: true,

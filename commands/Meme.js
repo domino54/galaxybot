@@ -4,6 +4,7 @@ const memesSub = "dankmemes";
 
 module.exports = {
 	name: "meme",
+	group: "fun",
 	description: `Get some hot memes directly from the [r/${memesSub}](https://www.reddit.com/r/${memesSub}) subreddit.`,
 
 	execute: command => {

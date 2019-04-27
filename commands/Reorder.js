@@ -2,6 +2,8 @@ const Discord = require("discord.js");
 
 module.exports = {
 	name: "reorder",
+	syntax: ["% <message>"],
+	group: "fun",
 	description: "The most pointless command, which shuffles the order of all words in the previously sent message, because reasons.",
 
 	execute: command => {

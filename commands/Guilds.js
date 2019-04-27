@@ -1,5 +1,6 @@
 module.exports = {
 	name: "guilds",
+	group: "info",
 	description: "The number of guilds GalaxyBot is active in. Full list featuring guilds names is available only to the bot owner, through a direct message.",
 
 	execute: command => {

@@ -1,6 +1,8 @@
 module.exports = {
 	name: "undo",
-	description: "Removes the latest track you've requested. Specify `quantity` to remove a certain number of tracks, or `all` to remove all your requests.",
+	syntax: ["% [count]", "% all"],
+	group: "music",
+	description: "Removes the latest track you've requested. Specify `count` to remove a certain number of tracks, or `all` to remove all your requests.",
 	serverOnly: true,
 	musicPlayer: true,
 	limitedAccess: true,
@@ -84,5 +86,7 @@ module.exports = {
 			const index = command.botGuild.tracksQueue.indexOf(track);
 			command.botGuild.tracksQueue.splice(index, 1);
 		}
+
+		command.botGuild.updateEmbedPlayer();
 	}
 }

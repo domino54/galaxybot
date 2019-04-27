@@ -1,5 +1,6 @@
 module.exports = {
 	name: "skip",
+	group: "music",
 	description: "Skips the currently played song. GalaxyBot managers can skip any song, while other users may skip it only if it's been requested by them.",
 	serverOnly: true,
 	musicPlayer: true,

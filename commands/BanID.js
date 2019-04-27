@@ -1,5 +1,7 @@
 module.exports = {
 	name: "banid",
+	syntax: ["% <id> [id] ..."],
+	group: "util",
 	description: "Allows moderators to ban users, who aren't members of the server by providing their user IDs.",
 	serverOnly: true,
 

@@ -1,5 +1,6 @@
 module.exports = {
 	name: "invite",
+	group: "util",
 	description: "Sends a link, which allows the user to add GalaxyBot to their server.",
 
 	execute: command => {

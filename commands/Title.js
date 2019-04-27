@@ -2,6 +2,9 @@ const ManiaPlanet = require("./../integrations/ManiaPlanet.js");
 
 module.exports = {
 	name: "title",
+	aliases: ["tp"],
+	syntax: ["% <uid|search>"],
+	group: "mp",
 	description: "Shows information about the given title from the ManiaPlanet website.",
 
 	execute: command => {

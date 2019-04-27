@@ -1,5 +1,7 @@
 module.exports = {
-	name: "git",
+	name: "github",
+	aliases: ["git"],
+	group: "info",
 	description: "Sends a link to the GitHub repository with source code of the GalaxyBot.",
 
 	execute: command => {

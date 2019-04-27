@@ -2,6 +2,9 @@ const Discord = require("discord.js");
 
 module.exports = {
 	name: "rename",
+	aliases: ["name", "nick"],
+	syntax: ["% <name>"],
+	group: "util",
 	description: "Changes the name of GalaxyBot in the server.",
 	serverOnly: true,
 

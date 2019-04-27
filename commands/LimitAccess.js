@@ -1,5 +1,7 @@
 module.exports = {
 	name: "limitaccess",
+	aliases: ["lock"],
+	group: "music",
 	description: "Shortcut to toggle the `limit-access` setting, which restricts the music player access to the GalaxyBot managers only.",
 	serverOnly: true,
 	musicPlayer: true,
@@ -14,6 +16,7 @@ module.exports = {
 
 		const isLimitedAccess = !command.botGuild.isPlayerLimitedAccess();
 		command.botGuild.setPlayerLimitedAccess(isLimitedAccess);
+		command.botGuild.updateEmbedPlayer();
 
 		// Enable the ristriction.
 		if (isLimitedAccess) {

@@ -2,6 +2,7 @@ const Discord = require("discord.js");
 
 module.exports = {
 	name: "about",
+	group: "info",
 	description: "Shows some details about the GalaxyBot.",
 
 	execute: command => {

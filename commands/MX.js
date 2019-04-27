@@ -1,7 +1,10 @@
 const ManiaExchange = require("./../integrations/ManiaExchange.js");
 
 module.exports = {
-	name: "mx",
+	name: "maniaexchange",
+	aliases: ["mx"],
+	syntax: ["% <tm|sm> <id|search>"],
+	group: "mp",
 	description: "Search for a Mania Exchange map by its ID or the map name.",
 
 	execute: command => {

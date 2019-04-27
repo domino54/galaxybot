@@ -3,7 +3,10 @@ const faceapp = require("faceapp");
 
 module.exports = {
 	name: "face",
-	description: "Apply a FaceApp filter on provided image. Syntax: `face filter url`. Type empty command to get the list of available filters.",
+	aliases: ["faceapp", "fa"],
+	syntax: ["%", "% <filter> [url]"],
+	group: "fun",
+	description: "Apply a FaceApp filter on provided image. Type empty command to get the list of available filters.",
 
 	execute: command => {
 		// Get the filters list.

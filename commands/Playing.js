@@ -1,5 +1,8 @@
 module.exports = {
 	name: "playing",
+	aliases: ["game"],
+	syntax: ["% <game>"],
+	group: "info",
 	description: "Current number of users seen by the GalaxyBot, which are playing the given `game`.",
 
 	execute: command => {
