@@ -25,7 +25,8 @@ const availableSettings = new Map([
 	["text-responses",	"Let GalaxyBot react with some preprogrammed responses to messages."],
 	["mocking-joy",		"Make fun of people, who tend to overuse the 😂 joy emoji."],
 	["servers-status",	"Text channel, where GalaxyBot will post and update statuses of selected ManiaPlanet servers, added using the `addserver` command. Up to 10 latest messages sent in the channel will show a status below them."],
-	["ignored-users",	"Members to be completely ignored by the bot. GalaxyBot managers bypass this restriction."]
+	["ignored-users",	"Members to be completely ignored by the bot. GalaxyBot managers bypass this restriction."],
+	["quoting",			"Let users quote previously sent messages by providing Id of a message or its permalink."]
 ]);
 
 /**
@@ -46,6 +47,7 @@ class Guild {
 		this.type = "guild";
 
 		// Music player.
+		this.embedPlayer = false;
 		this.lastTextChannel = undefined;
 		this.voiceConnection = undefined;
 		this.voiceDispatcher = undefined;
@@ -250,6 +252,35 @@ class Guild {
 	}
 
 	/**
+	 * Updates the existing embed player of the guild.
+	 */
+	updateEmbedPlayer() {
+		if (this.embedPlayer === false || !this.embedPlayer.ready) return;
+
+		let paused = this.voiceDispatcher && this.voiceDispatcher.paused;
+
+		this.embedPlayer.update(this.currentTrack, this.tracksQueue, paused, this.isPlayerLimitedAccess());
+	}
+
+	/**
+	 * Destroys the music player.
+	 */
+	destroyPlayer() {
+		// Clear the queue.
+		this.tracksQueue = [];
+		this.uniqueTracks = [];
+
+		// Clear all timers created by adding a playlist.
+		for (const item of this.pendingTimers) clearTimeout(item.timer);
+		this.pendingTimers = [];
+		this.lastStop = Date.now();
+
+		if (this.voiceDispatcher) this.voiceDispatcher.end();
+		if (this.voiceConnection) this.voiceConnection.disconnect();
+		if (this.embedPlayer) this.embedPlayer.destructor();
+	}
+
+	/**
 	 * Looks for next track in the queue and it finds any, plays it.
 	 */
 	playNextTrack() {
@@ -262,12 +293,16 @@ class Guild {
 			if (this.voiceConnection) {
 				this.voiceConnection.disconnect();
 				this.log("Queue empty, leaving the voice channel.");
+				if (this.embedPlayer) this.embedPlayer.destructor();
 			}
 			return;
 		}
 
 		// Pick first track from the queue.
 		this.currentTrack = this.tracksQueue.shift();
+
+		// Update the player.
+		this.updateEmbedPlayer();
 
 		// This can happen. Often.
 		if (this.voiceConnection === undefined) {
@@ -335,7 +370,6 @@ class Guild {
 			console.log(error);
 		});
 
-		// Show what's currently being played.
 		var header = this.currentTrack.isLivestream
 			? `I'm tuned up for the livestream, <@${this.currentTrack.senderId}>! :red_circle:`
 			: `I'm playing your ${this.currentTrack.type} now, <@${this.currentTrack.senderId}>! :metal:`;
@@ -462,7 +496,7 @@ class Guild {
 		const maxDuration = this.getSetting("max-duration");
 
 		if (!hasPermissions && maxDuration > 0 && track.duration > maxDuration) {
-			if (!isSilent) this.lastTextChannel.send(`Sorry ${member}, **${track.title}** is too long! (${Track.timeToText(track.duration)} / ${Track.timeToText(maxDuration)}) :rolling_eyes:`);
+			if (!isSilent) this.lastTextChannel.send(`Sorry ${member}, **${track.title}** is too long! (${Track.durationText} / ${Track.timeToText(maxDuration)}) :rolling_eyes:`);
 			this.log(`Track "${track.title}" not added: too long (${track.duration} / ${maxDuration}).`);
 			return;
 		}
@@ -518,7 +552,7 @@ class Guild {
 		else if (!this.currentTrack) this.playNextTrack();
 
 		// Play the track right now.
-		else if (options && options.isNow === true && hasPermissions && this.voiceDispatcher) {
+		else if (isNow && hasPermissions && this.voiceDispatcher) {
 			this.voiceDispatcher.end();
 			this.log("Skipping directly to the requested track.");
 		}
@@ -527,6 +561,11 @@ class Guild {
 		else if (!isSilent) {
 			var position = this.tracksQueue.indexOf(track) + 1;
 			this.lastTextChannel.send(`${member}, your ${track.type} is **#${position}** in the queue:`, track.embed);
+			this.updateEmbedPlayer();
+		}
+
+		else {
+			this.updateEmbedPlayer();
 		}
 	}
 

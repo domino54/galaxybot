@@ -4,6 +4,9 @@ const youtubedl = require("youtube-dl");
 
 module.exports = {
 	name: "play",
+	aliases: ["p"],
+	syntax: ["% <url> [next|now]", "% <search>", "%"],
+	group: "music",
 	description: "Connects to a voice channel and plays audio from the given link. You can request videos from SoundCloud, Mixcloud, YouTube, Vimeo, Dailymotion, Facebook and Streamable, send direct link to a file or a YouTube playlist (up to 100 videos). If an invalid URL is given, GalaxyBot will search the phrase in YouTube and play the first playable result. `now` and `next` allow GalaxyBot managers to play the track instantly or insert it at the beginning of the queue. If an audio file is attached to the message, GalaxyBot will attempt to play it.",
 	serverOnly: true,
 	musicPlayer: true,
@@ -111,7 +114,7 @@ module.exports = {
 			const playlistURL = ytlist[0];
 			const playlistID = playlistURL.match(/[\w-]+$/)[0];
 			
-			command.botGuild.addPlaylistYouTube(playlistID, command.member).then(nbVideos => {
+			command.botGuild.loadPlaylist(playlistID, command.member).then(nbVideos => {
 				if (nbVideos > 0) {
 					command.channel.send(`Okay ${command.user}, I'm adding **${nbVideos}** videos from your playlist to the queue!`);
 				}

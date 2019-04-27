@@ -1,5 +1,7 @@
 module.exports = {
 	name: "queue",
+	syntax: ["% [page]", "% me"],
+	group: "music",
 	description: "Lists up to 10 upcoming entries in the music player queue. Specify `page` to browse a certain page of the queue. `me` can be used to list your upcoming requests.",
 	serverOnly: true,
 	musicPlayer: true,
@@ -61,6 +63,7 @@ module.exports = {
 		else {
 			const pageArg = parseInt(command.arguments[0]);
 			const page = !isNaN(pageArg) && pageArg > 1 ? pageArg : 1;
+			const nbPages = Math.floor((command.botGuild.tracksQueue.length - 1) / 10) + 1;
 			const offset = (page - 1) * 10;
 
 			// Queue is not that long
@@ -78,7 +81,7 @@ module.exports = {
 				tracksList.push(`${i + 1}. ${track.title} (requested by ${track.sender.displayName})`);
 			}
 
-			command.channel.send(`There are **${command.botGuild.tracksQueue.length}** requests in the queue: \n\`\`\`${tracksList.join("\n")}\`\`\``);
+			command.channel.send(`There are **${command.botGuild.tracksQueue.length}** requests in the queue: \n\`\`\`${tracksList.join("\n")}\`\`\` Page ${page} of ${nbPages}`);
 		}
 	}
 }

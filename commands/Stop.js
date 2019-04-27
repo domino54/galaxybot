@@ -1,5 +1,6 @@
 module.exports = {
 	name: "stop",
+	group: "music",
 	description: "Allows GalaxyBot managers to stop music playback and clear the queue.",
 	serverOnly: true,
 	musicPlayer: true,
@@ -29,17 +30,6 @@ module.exports = {
 
 		command.channel.send(`Abort! Playback has been stopped and queue emptied, as requested by ${command.user}. :no_good:`);
 		command.botGuild.log("Stopped music player on request.");
-
-		// Clear the queue.
-		command.botGuild.tracksQueue = [];
-		command.botGuild.uniqueTracks = [];
-
-		// Clear all timers created by adding a playlist.
-		for (const item of command.botGuild.pendingTimers) clearTimeout(item.timer);
-		command.botGuild.pendingTimers = [];
-		command.botGuild.lastStop = Date.now();
-
-		if (command.botGuild.voiceDispatcher) command.botGuild.voiceDispatcher.end();
-		if (command.botGuild.voiceConnection) command.botGuild.voiceConnection.disconnect();
+		command.botGuild.destroyPlayer();
 	}
 }

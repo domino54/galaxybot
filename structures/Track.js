@@ -462,7 +462,6 @@ class Track {
 
 	/**
 	 * Format seconds into time.
-	 * Thx to someone from Stack Exchange...
 	 *
 	 * @param {Number} time - The time to format.
 	 * @returns {String} Nicely formatted time.
@@ -477,6 +476,11 @@ class Track {
 		output += "" + mins + ":" + (secs < 10 ? "0" : "");
 		output += "" + secs;
 		return output;
+	}
+
+	get durationText() {
+		if (this.duration <= 0) return "Unknown";
+		return this.constructor.timeToText(this.duration);
 	}
 
 	/**
@@ -505,7 +509,7 @@ class Track {
 			thumbnail: {
 				url: this.thumbnail
 			},
-			description: (this.isLivestream ? "Livestream" : "Duration: " + (this.duration > 0 ? this.constructor.timeToText(parseInt(this.duration)) : "unknown")),
+			description: (this.isLivestream ? "Livestream" : "Duration: " + (this.duration > 0 ? this.durationText : "unknown")),
 			footer: {
 				text: this.sender.displayName,
 				icon_url: this.sender.user.avatarURL
