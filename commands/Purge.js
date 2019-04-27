@@ -1,6 +1,8 @@
 module.exports = {
 	name: "purge",
-	description: "Removes up to 100 messages in current text channel. Requires both the sender and GalaxyBot to have **Manage messages** permissions in the channel. `user` can be specified to delete messages of a specific user.",
+	syntax: ["% <count> [user]"],
+	group: "util",
+	description: "Removes up to 100 messages in the current text channel. Requires both the sender and GalaxyBot to have **Manage messages** permissions in the channel. Name can be specified at the end of the command to target messages of the given user.",
 	serverOnly: true,
 
 	execute: command => {
@@ -32,7 +34,7 @@ module.exports = {
 		const parsedNumber = command.arguments[0] ? parseInt(command.arguments.shift()) : 0;
 
 		// Number of messages not specified.
-		if (parsedNumber < 1) {
+		if (isNaN(parsedNumber) || parsedNumber < 1) {
 			command.channel.send(`Sorry ${command.user}, but you have to tell me how many messages do you want me to remove (between 1 and 50).`);
 			command.botGuild.log("Messages quantity not specified.");
 			return;
@@ -62,13 +64,13 @@ module.exports = {
 		}
 
 		const memberTag = targetMember ? ` sent by \`${targetMember.user.tag}\`` : "";
-		command.channel.send(`Allright ${command.user}, let's **PURGE ${nbToDelete} messages**${memberTag} in this channel! :knife:`);
+		command.channel.send(`Alright ${command.user}, let's **PURGE ${nbToDelete} messages**${memberTag} in this channel! :knife:`);
 		command.botGuild.log(`PURGING ${nbToDelete} messages${memberTag}.`);
 		command.botGuild.nextPurgeAllowed = Date.now() + nbToDelete * 1000;
 
 		// Destroy the stuff.
-		function fetch(message) {
-			command.channel.fetchMessages({ limit: (targetMember ? 50 : nbToDelete), before: message.id }).then(messages => {
+		function fetch(msg) {
+			command.channel.fetchMessages({ limit: (targetMember ? 50 : nbToDelete), before: msg.id }).then(messages => {
 				var i = 0;
 
 				messages.forEach((message, messageId) => {
