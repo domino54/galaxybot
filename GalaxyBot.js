@@ -1147,24 +1147,26 @@ class GalaxyBot {
 			// Get filtered words list.
 			const filteredWords = guild.getSetting("filtered-words");
 			const matchingWords = guild.findFilteredWords(reaction.emoji.name, filteredWords);
+			const userProneToFiltering = guild.getSetting("filter-admins") === true || !guild.isGalaxyBotManager(member);
 
 			// Delete the reaction.
-			if (matchingWords.length > 0 && guild.getSetting("filter-admins") === true || !guild.isGalaxyBotManager(member)) {
-				reaction.remove(user).then(() => {
-					guild.log(`Deleted ${message.author.tag} reaction containing filtered phrases: ${matchingWords.join(", ")}.`);
-				})
-				.catch(error => {
-					guild.log("Couldn't filter out a reaction: missing permissions.");
-					// console.log(error);
-				});
+			if (matchingWords.length > 0 && userProneToFiltering) {
+				reaction.remove(user)
+					.then(() => {
+						guild.log(`Deleted ${user.tag} reaction containing filtered phrases: ${matchingWords.join(", ")}.`);
+					})
+					.catch(error => {
+						guild.log(error);
+					});
 			}
 		}
 
 		// Embed player functions.
 		if (guild.embedPlayer !== false && reaction.message.id == guild.embedPlayer.messageID && guild.currentTrack) {
-			reaction.remove(user).catch(error => {
-				guild.log(error);
-			});
+			reaction.remove(user)
+				.catch(error => {
+					guild.log(error);
+				});
 
 			let hasPermissions = guild.isGalaxyBotManager(member);
 
@@ -1240,23 +1242,17 @@ class GalaxyBot {
 			// Get filtered words list.
 			const filteredWords = guild.getSetting("filtered-words");
 			const matchingWords = guild.findFilteredWords(newMember.nickname, filteredWords);
+			const userProneToFiltering = guild.getSetting("filter-admins") === true || !guild.isGalaxyBotManager(newMember);
 
-			// Find filtered words, if there are any.
-			if (matchingWords.length > 0) {
-				// Ignore admins.
-				var applyFilter = guild.getSetting("filter-admins") === true || !guild.isGalaxyBotManager(newMember);
-				
-				// Delete the reaction.
-				if (applyFilter) {
-					newMember.setNickname("", "Nickname contains filtered words.")
-						.then(() => {
-							guild.log(`Changed ${newMember.user.tag} name, which contained filtered phrases: ${matchingWords.join(", ")}.`);
-						})
-						.catch(error => {
-							guild.log("Couldn't filter out a nickname: missing permissions.");
-							// console.log(error);
-						});
-				}
+			if (matchingWords.length > 0 && userProneToFiltering) {
+				newMember.setNickname("", "Nickname contains filtered words.")
+					.then(() => {
+						guild.log(`Changed ${newMember.user.tag} name, which contained filtered phrases: ${matchingWords.join(", ")}.`);
+					})
+					.catch(error => {
+						guild.log("Couldn't filter out a nickname: missing permissions.");
+						// console.log(error);
+					});
 			}
 		}
 	}

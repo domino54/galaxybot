@@ -26,7 +26,7 @@ const availableSettings = new Map([
 	["mocking-joy",		"Make fun of people, who tend to overuse the 😂 joy emoji."],
 	["servers-status",	"Text channel, where GalaxyBot will post and update statuses of selected ManiaPlanet servers, added using the `addserver` command. Up to 10 latest messages sent in the channel will show a status below them."],
 	["ignored-users",	"Members to be completely ignored by the bot. GalaxyBot managers bypass this restriction."],
-	["quoting",			"Let users quote previously sent messages by providing Id of a message or its permalink."]
+	["quoting",			"Let users quote previously sent messages by providing ID of a message or its permalink."]
 ]);
 
 /**
@@ -268,7 +268,6 @@ class Guild {
 	destroyPlayer() {
 		// Clear the queue.
 		this.tracksQueue = [];
-		this.uniqueTracks = [];
 
 		// Clear all timers created by adding a playlist.
 		for (const item of this.pendingTimers) clearTimeout(item.timer);
@@ -290,11 +289,7 @@ class Guild {
 
 		// Leave voice channel if queue is empty.
 		if (this.tracksQueue.length <= 0) {
-			if (this.voiceConnection) {
-				this.voiceConnection.disconnect();
-				this.log("Queue empty, leaving the voice channel.");
-				if (this.embedPlayer) this.embedPlayer.destructor();
-			}
+			this.destroyPlayer();
 			return;
 		}
 

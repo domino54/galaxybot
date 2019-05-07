@@ -4,7 +4,7 @@ const ServerBrowser = require("./../structures/ServerBrowser.js");
 
 module.exports = {
 	name: "servers",
-	syntax: ["% <uid|search>"],
+	syntax: ["% <uid|search> [page]"],
 	group: "mp",
 	description: "Listing up to 10 most populated servers of a specific ManiaPlanet title. By adding `page`, you can navigate through the list.",
 
